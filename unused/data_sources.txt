@@ -1,0 +1,11 @@
+/report_cards/SRC2004_Exported/SRC2004.sql
+/report_cards/SRC2005_Exported/SRC2005.sql
+/report_cards/SRC2006_Exported/SRC2006.sql
+/report_cards/SRC2007_Exported/SRC2007.sql
+/report_cards/SRC2008_Exported/SRC2008.sql
+/report_cards/SRC2009_Exported/SRC2009.sql
+/report_cards/SRC2010_Exported/SRC2010.sql
+/report_cards/SRC2011_Exported/SRC2011.sql
+/report_cards/SRC2012_Exported/SRC2012.sql
+/report_cards/SRC2013_Exported/SRC2013.sql
+/report_cards/SRC2014_Exported/SRC2014.sql
