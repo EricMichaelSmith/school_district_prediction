@@ -1,6 +1,6 @@
 # Variables
 #year_l = range(2004, 2015)
-year_l = range(2013, 2015)
+year_l = range(2007, 2015)
 regents_table_s_d = {2004: 'Regents',
                      2005: 'Regents',
                      2006: 'Regents Results 2005-06',
