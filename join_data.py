@@ -81,8 +81,9 @@ WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
     cur.execute(command_s.format(year))
     command_s = """CREATE TABLE temp{0:d}_averaged
 SELECT ENTITY_CD_{0:d}, AVG(percent_passing_{0:d}) FROM temp{0:d}_filtered
-WHERE SUBJECT_{0:d} IN ('REG_GLHIST', 'REG_USHG_RV', 'REG_ENG', 'REG_INTALG', 'REG_ESCI_PS', 'REG_LENV')
+WHERE SUBJECT_{0:d} IN ('REG_GLHIST', 'REG_USHG_RV', 'REG_ENG', 'REG_INTALG', 'REG_ESCI_PS', 'REG_LENV', 'REG_MATHA')
 GROUP BY ENTITY_CD_{0:d};"""
+# At some point REG_MATHA disappeared and got replaced by REG_INTALG
     cur.execute(command_s.format(year))
     command_s = """ALTER TABLE temp{0:d}_averaged
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d})"""
