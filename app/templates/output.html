@@ -57,18 +57,18 @@
 
   <div class="container">
     <div class="starter-template">
-        <h2>Output Page</h2>
-        <p>Enter some user input</p>
+        <h2>Schoolstradamus (a.k.a. "I Can't Think of a Good Title Right Now")</h2>
+        <p>This program will compare the test scores of two school districts, not only over the past few years, but also extrapolated into the future. Eventually the user will be able to search for names of school districts, but for now he/she must search by ID number only:</p>
     </div>
 
     <div class = "container">
 
       <form  action="/output" method="GET">
         <div class="form-group">
-          <label for="ID1">School ID 1 (just use '270100010010' for now):</label>
+          <label for="ID1"><font color="red">School ID 1</font> (just use '270100010010' for now):</label>
           <input type="text" id="ID1" name='ID1' placeholder="Don't be fancy.">
           <br>
-          <label for="ID2">School ID 2 (just use '270301040002' for now):</label>
+          <label for="ID2"><font color="blue">School ID 2</font> (just use '270301040002' for now):</label>
           <input type="text" id="ID2" name='ID2' placeholder="">
         </div>
         <div>
@@ -83,26 +83,10 @@
 
     <div class="container">
       <div class="starter-template">
-        <h3>Results:</h3>
-        <p class="lead">Below is the result of your query.<br> You just took user input and looked up the information. Now we need to expand the functionality!</p>
+        <h3>Predicted test scores:</h3>
+        <img src="http://127.0.0.1:5000/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}"/>
       </div>
-
-      <table class="table table-hover">
-      <tr><th>ID</th><th>School Name</th><th>Actual Average 2014 Regents Exams Pass Rate</th></tr>
-      {% for school in schools1 %}
-      <tr><td>{{ school['id'] }}</td><td>{{ school['name']}}</td><td> {{ school['pass_rate_2014'] }}</td></tr>
-      {% endfor %}
-      </table>
-
-
-     </div><!-- /.container -->
-
-    <div class="container">
-      <div class="starter-template">
-        <h3>Another Result:</h3>
-        <p class="lead">Now we've taken the input and called a function from your package.<br>The result is {{the_result}}</p>
-        <img src="http://127.0.0.1:5000/plot?ID1={{ schools1[0]['id'] }}&ID2={{ schools2[0]['id'] }}"/>
-      </div>
+      <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
 
 
       <script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
