@@ -3,7 +3,7 @@ from flask import render_template, request
 from app import app
 import pymysql as mdb
 
-db= mdb.connect(user="root", host="localhost", db="world_innodb", charset='utf8')
+db= mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
 
 @app.route('/')
 @app.route('/index')
@@ -12,31 +12,6 @@ def index():
         title = 'Home',
         )
 
-@app.route('/db')
-def cities_page():
-    with db: 
-        cur = db.cursor()
-        cur.execute("SELECT Name FROM City LIMIT 15;")
-        query_results = cur.fetchall()
-    cities = ""
-    for result in query_results:
-        cities += result[0]
-        cities += "<br>"
-    return cities
-
-@app.route("/db_fancy")
-def cities_page_fancy():
-    with db:
-        cur = db.cursor()
-        cur.execute("SELECT Name, CountryCode, " +
-                "Population FROM City ORDER BY Population LIMIT 15;")
-
-        query_results = cur.fetchall()
-    cities = []
-    for result in query_results:
-        cities.append(dict(name=result[0], country=result[1], population=result[2]))
-    return render_template('cities.html', cities=cities)
-
 @app.route('/input')
 def cities_input():
   return render_template("input.html")
@@ -44,19 +19,21 @@ def cities_input():
 @app.route('/output')
 def cities_output():
   #pull 'ID' from input field and store it
-  city = request.args.get('ID')
+  ID1 = request.args.get('ID1')
 
   with db:
     cur = db.cursor()
-    #just select the city from the world_innodb that the user inputs
-    cur.execute("SELECT Name, CountryCode,  Population FROM City WHERE Name='%s';" % city)
+    #just select the city from 'joined' that the user inputs
+    command_s = """SELECT ENTITY_CD, ENTITY_NAME, `AVG(percent_passing_2014)`
+FROM regents_pass_rate WHERE ENTITY_CD='{0}';"""
+    cur.execute(command_s.format(ID1))
     query_results = cur.fetchall()
 
-  cities = []
+  schools = []
   for result in query_results:
-    cities.append(dict(name=result[0], country=result[1], population=result[2]))
+    schools.append(dict(id=result[0], name=result[1], pass_rate_2014=result[2]))
 
   #call a function from a_Model package. note we are only pulling one result in the query
-  pop_input = cities[0]['population']
-  the_result = ModelIt(city, pop_input)
-  return render_template("output.html", cities = cities, the_result = the_result)
+  pass_rate_input = schools[0]['pass_rate_2014']
+  the_result = ModelIt(ID1, pass_rate_input)
+  return render_template("output.html", schools = schools, the_result = the_result)

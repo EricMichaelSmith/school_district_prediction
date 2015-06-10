@@ -65,11 +65,14 @@
 
       <form  action="/output" method="GET">
         <div class="form-group">
-          <label for="ID">City  Name:</label>
-          <input type="text" id="ID" name='ID' placeholder="e.g. ">
+          <label for="ID1">School ID 1 (just use '270100010010' for now):</label>
+          <input type="text" id="ID1" name='ID1' placeholder="Don't be fancy.">
+          <br>
+          <label for="ID2">School ID 2 (just use '270301040002' for now):</label>
+          <input type="text" id="ID2" name='ID2' placeholder="">
         </div>
         <div>
-          <button type="submit" class="btn btn-default btn-lg">Find this city!</button>
+          <button type="submit" class="btn btn-default btn-lg">Find these schools!</button>
         </div>
       </form>
     </div>
@@ -85,9 +88,9 @@
       </div>
 
       <table class="table table-hover">
-      <tr><th>Name</th><th>Country</th><th>Population</th></tr>
-      {% for city in cities %}
-      <tr><td>{{ city['name'] }}</td><td>{{ city['country']}}</td><td> {{ city['population'] }}</td></tr>
+      <tr><th>ID</th><th>School Name</th><th>Actual Average 2014 Regents Exams Pass Rate</th></tr>
+      {% for school in schools %}
+      <tr><td>{{ school['id'] }}</td><td>{{ school['name']}}</td><td> {{ school['pass_rate_2014'] }}</td></tr>
       {% endfor %}
       </table>
 
