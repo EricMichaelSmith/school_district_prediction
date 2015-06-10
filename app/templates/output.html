@@ -89,7 +89,7 @@
 
       <table class="table table-hover">
       <tr><th>ID</th><th>School Name</th><th>Actual Average 2014 Regents Exams Pass Rate</th></tr>
-      {% for school in schools %}
+      {% for school in schools1 %}
       <tr><td>{{ school['id'] }}</td><td>{{ school['name']}}</td><td> {{ school['pass_rate_2014'] }}</td></tr>
       {% endfor %}
       </table>
@@ -101,6 +101,7 @@
       <div class="starter-template">
         <h3>Another Result:</h3>
         <p class="lead">Now we've taken the input and called a function from your package.<br>The result is {{the_result}}</p>
+        <img src="http://127.0.0.1:5000/plot?ID1={{ schools1[0]['id'] }}&ID2={{ schools2[0]['id'] }}"/>
       </div>
 
 
