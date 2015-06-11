@@ -71,8 +71,8 @@ def main():
     print(no_change_results.params)
     no_change_prediction_a = no_change_results.predict(X)
     print('No change from previous year:\n\t{:f}'\
-        .format(find_mse(year_to_predict_diff_df.as_matrix(),
-                         no_change_prediction_a)))
+          .format(find_mse(year_to_predict_diff_df.as_matrix(),
+                           no_change_prediction_a)))
                                                               
     # Predict the test scores of the next year (currently 2015)
     X = diff_df.iloc[-1, :].as_matrix()
@@ -89,9 +89,128 @@ def main():
                                                columns=[new_column_s])
     utilities.write_to_sql_table(AR1_next_year_prediction_df,
                                  'regents_pass_rate_prediction', 'joined')
-                                 
-    # {{{call perform_auto_regression a bunch of times, both on the differentiated and undifferentiated data, and then do four controls: mean of pass rate, median of pass rate, propagate last past rate, propagate last change in pass rate. Plot these 14 measures or at least some of them on a graph, but see which ones are highest/lowest.}}}
+             
 
+    ## Run regression models, validate and predict future scores, and run controls
+    data_a = data_no_na_df[:, 1:].as_matrix()
+    # Take out ENTITY_CD so that all columns are test scores
+    last_fitted_year_actual_a = data_a[:, -2]
+    last_data_year_actual_a = data_a[:, -1]
+    
+    diff_a = np.diff(data_a, n=1, axis=1)
+    last_fitted_year_actual_diff_a = diff_a[:, -2]
+    last_data_year_actual_diff_a = diff_a[:, -1]
+    
+    all_results_d = {}
+    lag_l = range(1, 6)
+    num_years_to_predict = 3
+    
+    # Run autoregression with different lags on raw test scores
+    for lag in lag_l:
+        model_s = 'raw_lag{:d}'.format(lag)
+        results_d = {}
+        
+        results_d.result_object = perform_auto_regression(data_a[:, :-1], lag)
+        last_fitted_year_prediction_a = \
+            predict_given_auto_regression(data_a[:, :-2], results_d.result_object)
+        results_d.last_fitted_year_mse = find_mse(last_fitted_year_actual_a,
+                                                  last_fitted_year_prediction_a)
+        last_data_year_prediction_a = \
+            predict_given_auto_regression(data_a[:, :-1], results_d.result_object)
+        results_d.last_data_year_mse = find_mse(last_data_year_actual_a,
+                                                last_data_year_prediction_a)    
+        future_prediction_a = np.ndarray((data_a.shape[0], 0))
+        for year in range(num_years_to_predict):
+            combined_data_a = np.concatenate((data_a, future_prediction_a), axis=1)
+            new_year_prediction_a = predict_given_auto_regression(combined_data_a)
+            future_prediction_a = np.concatenate((future_prediction_a,
+                                                  new_year_prediction_a), axis=1)
+        results_d.prediction_a = future_prediction_a
+        
+        all_results_d[model_s] = results_d
+    
+    # Run autogression with different lags on diff of test scores w.r.t. year
+    for lag in lag_l:
+        model_s = 'diff_lag{:d}'.format(lag)
+        results_d = {}
+        
+        results_d.result_object = perform_auto_regression(diff_a[:, :-1], lag)
+        last_fitted_year_prediction_a = \
+            predict_given_auto_regression(diff_a[:, :-2], results_d.result_object)
+        results_d.last_fitted_year_mse = find_mse(last_fitted_year_actual_diff_a,
+                                                  last_fitted_year_prediction_a)
+        last_data_year_prediction_a = \
+            predict_given_auto_regression(diff_a[:, :-1], results_d.result_object)
+        results_d.last_data_year_mse = find_mse(last_data_year_actual_diff_a,
+                                                last_data_year_prediction_a)    
+        future_prediction_a = np.ndarray((diff_a.shape[0], 0))
+        for year in range(num_years_to_predict):
+            combined_data_a = np.concatenate((diff_a, future_prediction_a), axis=1)
+            new_year_prediction_a = predict_given_auto_regression(combined_data_a)
+            future_prediction_a = np.concatenate((future_prediction_a,
+                                                  new_year_prediction_a), axis=1)
+        results_d.prediction_a = future_prediction_a
+        
+        all_results_d[model_s] = results_d
+        
+    # Run control: prediction is same as mean over years in training set
+    model_s = 'mean_score_control'
+    results_d = {}
+    results_d.result_object = None
+    results_d.last_fitted_year_mse = find_mse(last_fitted_year_actual_a,
+                                              np.mean(data_a[:, :-1], axis=1))
+    results_d.last_data_year_mse = find_mse(last_data_year_actual_a,
+                                            np.mean(data_a[:, :-1], axis=1))
+    results_d.prediction_a = np.tile(np.mean(data_a[:, 1:], axis=1),
+                                     (1, num_years_to_predict))
+ 
+    # Run control: prediction is same as previous year's data
+    model_s = 'last_years_score_control'
+    results_d = {}
+    results_d.result_object = None
+    results_d.last_fitted_year_mse = find_mse(last_fitted_year_actual_a,
+                                              data_a[:, -2])
+    results_d.last_data_year_mse = find_mse(last_data_year_actual_a,
+                                            data_a[:, -2])
+    results_d.prediction_a = np.tile(data_a[:, -1], (1, num_years_to_predict))
+                   
+    # {{{call perform_auto_regression a bunch of times, both on the differentiated and undifferentiated data, and then do four controls: mean of pass rate, median of pass rate, propagate last past rate, propagate last change in pass rate. For each of these, perform the regression on 2007--2013 and get back the results object; "predict" 2013 and calculate the MSE; "predict" 2014 and calculate the MSE; and predict 2015. Plot these 14 measures or at least some of them on a graph, but see which ones are highest/lowest.}}}
+
+
+
+class AutoRegression(object):
+
+    def __init__(self):
+        pass
+
+    def fit(self, array, options_d=None):
+        """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+
+        lag = options_d['lag']        
+        
+        # Create model and fit parameters
+        Y = array[:, lag:].reshape(-1)
+        X = np.ndarray((Y.shape[0], 0))
+        for i in range(lag):
+            X = np.concatenate((X, array[:, i:-lag+i]).reshape(-1), axis=1)
+        X = sm.add_constant(X)
+        # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
+        model = sm.OLS(Y, X)
+        results = model.fit()
+        print('Lag of {0:d}:'.format(lag))
+        print(results.params)
+        
+        return results
+        
+    def predict(self, array, results):
+        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+    
+    lag = len(results.params)-1
+    X = array[:, -lag:]
+    X = sm.add_constant(X)
+        
+    return results.predict(X)
+        
         
         
 def find_mse(Y, prediction_Y):
@@ -99,20 +218,31 @@ def find_mse(Y, prediction_Y):
     
     
     
-def perform_auto_regression(df, lag):
-    """ Performs an auto-regression of lag lag on DataFrame df. """
+def fit_and_predict(array, Class, options_d={}):
+    """ Given an array, fits it using Class and the optional options. """
     
-    Y = df.iloc[lag:, :].as_matrix().reshape(-1)
-    X = np.ndarray((Y.shape[0], 0))
-    for i in range(lag):
-        X = np.concatenate((X, df.iloc[i:-lag+i]), axis=1)
-    X = sm.add_constant(X)
-    # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
-    model = sm.OLS(Y, X)
-    results = model.fit()
-    print('Lag of {0:d}:'.format(lag))
-    print(results.params)
-    # {{{output: the prediction for the current year, the output for the next year, and the coefficients. Remember that, when you're assessing the validity of the models, you'll have to set Y to be *2013* to train so that you can test the models on 2014 data.}}}
+    num_years_to_predict = 3    
+    
+    results_d = {}
+        
+    results_d.result_object = Class.fit(array[:, :-1], options_d)
+    last_fitted_year_prediction_a = \
+        Class.predict(array[:, :-2], results_d.result_object)
+    results_d.last_fitted_year_mse = find_mse(data_a[:, -2],
+                                              last_fitted_year_prediction_a)
+    last_data_year_prediction_a = \
+        Class.predict(array[:, :-1], results_d.result_object)
+    results_d.last_data_year_mse = find_mse(data_a[:, -1],
+                                            last_data_year_prediction_a)    
+    future_prediction_a = np.ndarray((array.shape[0], 0))
+    for year in range(num_years_to_predict):
+        combined_data_a = np.concatenate((array, future_prediction_a), axis=1)
+        new_year_prediction_a = Class.predict(combined_data_a, results_d.result_object)
+        future_prediction_a = np.concatenate((future_prediction_a,
+                                              new_year_prediction_a), axis=1)
+    results_d.prediction_a = future_prediction_a
+    
+    return results_d
     
     
     
