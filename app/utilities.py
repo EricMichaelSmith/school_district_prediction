@@ -51,4 +51,4 @@ def write_to_sql_table(df, table_s, database_s):
     engine = create_engine('mysql+pymysql://root:@localhost/' + database_s, echo=False)
     engine.execute('DROP TABLE IF EXISTS {0};'.format(table_s))
     cnx = engine.raw_connection()
-    df.to_sql(name=table_s, con=cnx, flavor='mysql', if_exists='replace')    
+    df.to_sql(name=table_s, con=cnx, flavor='mysql', if_exists='replace')
