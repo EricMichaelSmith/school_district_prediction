@@ -89,11 +89,30 @@ def main():
                                                columns=[new_column_s])
     utilities.write_to_sql_table(AR1_next_year_prediction_df,
                                  'regents_pass_rate_prediction', 'joined')
+                                 
+    # {{{call perform_auto_regression a bunch of times, both on the differentiated and undifferentiated data, and then do four controls: mean of pass rate, median of pass rate, propagate last past rate, propagate last change in pass rate. Plot these 14 measures or at least some of them on a graph, but see which ones are highest/lowest.}}}
 
         
         
 def find_mse(Y, prediction_Y):
     return np.sum((Y - prediction_Y)**2)
+    
+    
+    
+def perform_auto_regression(df, lag):
+    """ Performs an auto-regression of lag lag on DataFrame df. """
+    
+    Y = df.iloc[lag:, :].as_matrix().reshape(-1)
+    X = np.ndarray((Y.shape[0], 0))
+    for i in range(lag):
+        X = np.concatenate((X, df.iloc[i:-lag+i]), axis=1)
+    X = sm.add_constant(X)
+    # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
+    model = sm.OLS(Y, X)
+    results = model.fit()
+    print('Lag of {0:d}:'.format(lag))
+    print(results.params)
+    # {{{output: the prediction for the current year, the output for the next year, and the coefficients. Remember that, when you're assessing the validity of the models, you'll have to set Y to be *2013* to train so that you can test the models on 2014 data.}}}
     
     
     
