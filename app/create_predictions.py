@@ -77,10 +77,54 @@ def main():
     
     
     ## Plot MSEs of all regression models
-    # {{{Plot these 14 measures or at least some of them on a graph, but see which ones are highest/lowest.}}}
-                   
+    model_s_l = ['raw_lag1', 'raw_lag2', 'raw_lag3', 'raw_lag4', 'raw_lag5', 'diff_lag1', 'diff_lag2', 'diff_lag3', 'diff_lag4', 'diff_lag5', 'mean_over_years_score_control', 'same_as_last_year_score_control', 'same_change_as_last_year_score_control']
+    mse_l = [all_mses_d[key] for key in model_s_l]
+    fig = plt.figure()
+    ax = fig.add_subplot(111) 
+    ax.bar(range(len(mse_l)), mse_l)
+    ax.set_title('Comparison of MSE of autoregression algorithms vs. controls')
+    ax.set_xticks(np.arange(len(mse_l)))
+    ax.set_xticklabels(model_s_l, rotation=45)
+    ax.set_ylabel('Mean squared error')
+    ax.axhline(y=all_mses_d['mean_over_years_score_control'], color='r')
+    plt.savefig('mse_all_models.png')
                    
     ## {{{Then, save them all to a database.}}}
+                   
+                   
+    ## Exploratory plots
+    fig = plt.figure()
+    ax = fig.add_subplot(111)                   
+    ax.plot(config.year_l, data_a.transpose())
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Percent passing English Regents exam')
+    ax.set_ylim([0, 100])
+    ax.ticklabel_format(useOffset=False)
+    plt.savefig('all_schools.png')
+    
+    ## Exploratory plots
+    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 20)
+    to_plot_a = data_a[significant_rising_la, :].transpose()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(config.year_l, to_plot_a)
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Percent passing English Regents exam')
+    ax.set_ylim([0, 100])
+    ax.ticklabel_format(useOffset=False)
+    plt.savefig('significant_rising.png')
+    
+    ## Exploratory plots
+    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -20)
+    to_plot_a = data_a[significant_falling_la, :].transpose()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(config.year_l, to_plot_a)
+    ax.set_xlabel('Year')
+    ax.set_ylabel('Percent passing English Regents exam')
+    ax.set_ylim([0, 100])
+    ax.ticklabel_format(useOffset=False)
+    plt.savefig('significant_falling.png')
 
 
 
