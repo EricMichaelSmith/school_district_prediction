@@ -1,4 +1,4 @@
-#!/usr/bin/env
+#!/usr/bin/env python
 """
 Join all data in SQL databases
 """
@@ -75,18 +75,20 @@ CHANGE `NUM_85-100` `NUM_85-100` INT;"""
         command_s = """ALTER TABLE temp{0:d} ADD fraction_passing_{0:d} FLOAT(23);"""
         cur.execute(command_s.format(year))
         command_s = """UPDATE temp{0:d}
-SET fraction_passing_{0:d} = (`PER_65-84` + `PER_85-100`) / TESTED;"""
+SET fraction_passing_{0:d} = (`NUM_65-84` + `NUM_85-100`) / TESTED;"""
         cur.execute(command_s.format(year))
     else:
         command_s = """DELETE FROM temp{0:d}
-WHERE Tested = 's' OR `65-100` = 's';"""
+WHERE Tested = '#' OR `65-100` = '#';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE BEDS_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE SUBJECT_CD SUBJECT_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
-        command_s = """ALTER TABLE temp{0:d} CHANGE GROUP_NAME SUBGROUP_NAME;"""
-        cur.execute(command_s.format(year))
+        if year == 2006:
+            command_s = """ALTER TABLE temp{0:d}
+CHANGE GROUP_NAME SUBGROUP_NAME CHAR(30);"""
+            cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d}
 CHANGE Tested Tested INT;"""
         cur.execute(command_s.format(year))
@@ -101,9 +103,14 @@ SET fraction_passing_{0:d} = `65-100` / Tested;"""
     command_s = 'DROP TABLE IF EXISTS temp{0:d}_filtered;'
     cur.execute(command_s.format(year))
     print('Starting to filter for year {:d}'.format(year))
-    command_s = """CREATE TABLE temp{0:d}_filtered
+    if year >= 2006:
+        command_s = """CREATE TABLE temp{0:d}_filtered
 SELECT ENTITY_CD_{0:d}, SUBJECT_{0:d}, fraction_passing_{0:d} FROM temp{0:d}
 WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
+    else:
+        command_s = """CREATE TABLE temp{0:d}_filtered
+SELECT ENTITY_CD_{0:d}, SUBJECT_{0:d}, fraction_passing_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
     cur.execute(command_s.format(year))
     command_s = 'DROP TABLE IF EXISTS temp{0:d}_averaged;'
     cur.execute(command_s.format(year))
