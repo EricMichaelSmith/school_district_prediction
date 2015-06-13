@@ -136,11 +136,34 @@ def main():
     prediction_df = pd.DataFrame(all_results_d[model_to_save_s]['prediction_a'],
                                  index=data_no_na_df['ENTITY_CD'],
                                  columns=new_column_s_l)
-    print(prediction_df)
     utilities.write_to_sql_table(prediction_df,
                                  'regents_pass_rate_prediction', 'joined')    
 
 
+
+# Let's think about applying statsmodels' ARIMA model later: I'm thinking that the way to do this is to bring in all data except for one high school's time series data using the "exog" keyword, but I don't think that's truly cross-sectional: "exog" seems to be more useful for predicting future test pass rates from past past rates and funding level, for example, not from past pass rates of the school in question and all other schools. And Des seems to be right that vector ARIMA isn't the way to go here, because it seems like each sample in the cross-section still gets its own fitted variables, right?
+#class ARIMA(object):
+#    
+#    def __init__(self):
+#        pass
+#
+#    def fit(self, raw_array, order_t=(0,0,0)):
+#        """ Performs an ARIMA on raw_array given (p,d,q) as order_t. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+#
+#        results = sm.tsa.ARIMA(raw_array.transpose(), order_t).fit()
+#        print('(p, d, q) = ({0:d}, {0:d}, {0:d}):'.format(order_t[0],
+#                                                          order_t[1],
+#                                                          order_t[2]))
+#        print(results.params)
+#        
+#        return results
+#                
+#    def predict(self, raw_array, results, order_t=(0,0,0))
+#        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+#
+#        # {{{}}}        
+        
+    
 
 class AutoRegression(object):
 

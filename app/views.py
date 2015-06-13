@@ -33,14 +33,20 @@ def schools_output():
     school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
         schools2_prediction[0]['score_l'][-1]
     num_years_prediction = len(schools1_prediction[0]['score_l'])
+    if num_years_prediction == 1:
+        year_s = 'year'
+    else:
+        year_s = 'years'
     if school1_predicted_difference > 0:
-        output_message_s = "Prediction: School 1's average passing rate will be {0:0.1f}% higher in {1:d} year(s).".format(school1_predicted_difference*100, num_years_prediction)
+        output_message_s = "Prediction: School 1's average passing rate will be {0:0.1f}% higher in {1:d} {2}.".format(school1_predicted_difference*100,
+                             num_years_prediction, year_s)
         output_message_color_s = 'red'
     elif school1_predicted_difference < 0:
-        output_message_s = "Prediction: School 2's average passing rate will be {0:0.1f}% higher in {1:d} year(s).".format(-school1_predicted_difference*100, num_years_prediction)
+        output_message_s = "Prediction: School 2's average passing rate will be {0:0.1f}% higher in {1:d} {2}.".format(-school1_predicted_difference*100,
+                             num_years_prediction, year_s)
         output_message_color_s = 'blue'
     else:
-        output_message_s = "Prediction: both schools' test scores will be equal in {0:d} year(s).".format(num_years_prediction)
+        output_message_s = "Prediction: both schools' test scores will be equal in {0:d} {1}.".format(num_years_prediction, year_s)
         output_message_color_s = 'black'
 
     return render_template("output.html",
