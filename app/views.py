@@ -2,6 +2,7 @@ from app import app
 from flask import make_response, render_template, request
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.pyplot as plt
+import numpy as np
 import pymysql as mdb
 import StringIO
 
@@ -28,15 +29,15 @@ def schools_output():
     schools1_past = query_past_scores(ID1)
     schools1_prediction = query_prediction_scores(ID1)
     schools2_past = query_past_scores(ID2)
-    schools2_prediction = query_prediction_scores(ID2)   
+    schools2_prediction = query_prediction_scores(ID2) 
     school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
         schools2_prediction[0]['score_l'][-1]
     num_years_prediction = len(schools1_prediction[0]['score_l'])
     if school1_predicted_difference > 0:
-        output_message_s = "Prediction: School 1's average passing rate will be {0:0.2f}% higher in {1:d} year(s).".format(school1_predicted_difference, num_years_prediction)
+        output_message_s = "Prediction: School 1's average passing rate will be {0:0.1f}% higher in {1:d} year(s).".format(school1_predicted_difference*100, num_years_prediction)
         output_message_color_s = 'red'
     elif school1_predicted_difference < 0:
-        output_message_s = "Prediction: School 2's average passing rate will be {0:0.2f}% higher in {1:d} year(s).".format(-school1_predicted_difference, num_years_prediction)
+        output_message_s = "Prediction: School 2's average passing rate will be {0:0.1f}% higher in {1:d} year(s).".format(-school1_predicted_difference*100, num_years_prediction)
         output_message_color_s = 'blue'
     else:
         output_message_s = "Prediction: both schools' test scores will be equal in {0:d} year(s).".format(num_years_prediction)
@@ -64,16 +65,16 @@ def plot():
     fig = plt.Figure()
     axis = fig.add_axes([0.1, 0.23, 0.8, 0.67])
  
-    curve1, = axis.plot(config.year_l, schools1_past[0]['score_l'], 'r')
-    curve2, = axis.plot(config.year_l, schools2_past[0]['score_l'], 'b')
+    curve1, = axis.plot(config.year_l, np.array(schools1_past[0]['score_l'])*100, 'r')
+    curve2, = axis.plot(config.year_l, np.array(schools2_past[0]['score_l'])*100, 'b')
     schools1_extrapolation_l = schools1_past[0]['score_l'][-1:] + \
         schools1_prediction[0]['score_l']
     schools2_extrapolation_l = schools2_past[0]['score_l'][-1:] + \
         schools2_prediction[0]['score_l']
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
-              schools1_extrapolation_l, 'r--')
+              np.array(schools1_extrapolation_l)*100, 'r--')
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
-              schools2_extrapolation_l, 'b--')
+              np.array(schools2_extrapolation_l)*100, 'b--')
     axis.set_xlabel('Year')
     axis.set_title('Percent passing Regents Exams\n(averaged over subjects)')
     axis.ticklabel_format(useOffset=False)
@@ -94,8 +95,8 @@ def query_past_scores(ID):
         #just select the city from 'joined' that the user inputs
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
         for year in config.year_l:
-            command_s += '`AVG(percent_passing_{:d})`, '.format(year)
-        command_s = command_s[0:-2]
+            command_s += '`AVG(fraction_passing_{:d})`, '.format(year)
+        command_s = command_s[:-2]
         command_s += " FROM regents_pass_rate WHERE ENTITY_CD='{0}';"
         cur.execute(command_s.format(ID))
         query_results = cur.fetchall()
@@ -115,8 +116,8 @@ def query_prediction_scores(ID):
         #just select the city from 'joined' that the user inputs
         command_s = 'SELECT ENTITY_CD, '
         for year in config.prediction_year_l:
-            command_s += 'avg_percent_passing_prediction_{:d}, '.format(year)
-        command_s = command_s[0:-2]
+            command_s += 'avg_fraction_passing_prediction_{:d}, '.format(year)
+        command_s = command_s[:-2]
         command_s += " FROM regents_pass_rate_prediction WHERE ENTITY_CD='{0}';"
         cur.execute(command_s.format(ID))
         query_results = cur.fetchall()

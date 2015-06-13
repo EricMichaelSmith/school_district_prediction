@@ -10,8 +10,7 @@ Just visualize the data
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas
-reload(pandas)
+import os
 import pandas as pd
 import statsmodels.api as sm
 
@@ -70,28 +69,33 @@ def main():
     # Run control: prediction is same as previous year's data
     model_s = 'same_change_as_last_year_score_control'
     all_results_d[model_s] = fit_and_predict(data_a, SameChangeAsLastYear)
-    
-    all_mses_d = {key: value['last_data_year_mse'] for (key, value) in all_results_d.iteritems()}
-    for key, value in all_mses_d.iteritems():
+
+    all_train_mses_d = {key: value['last_fitted_year_mse'] for (key, value) in all_results_d.iteritems()}    
+    all_test_mses_d = {key: value['last_data_year_mse'] for (key, value) in all_results_d.iteritems()}
+    for key, value in all_test_mses_d.iteritems():
         print('{0}: \n\t{1:1.5g}'.format(key, value))
     
     
-    ## Plot MSEs of all regression models
+    ## Plot MSEs of all regression models     
     model_s_l = ['raw_lag1', 'raw_lag2', 'raw_lag3', 'raw_lag4', 'raw_lag5', 'diff_lag1', 'diff_lag2', 'diff_lag3', 'diff_lag4', 'diff_lag5', 'mean_over_years_score_control', 'same_as_last_year_score_control', 'same_change_as_last_year_score_control']
-    mse_l = [all_mses_d[key] for key in model_s_l]
+    train_mse_l = [all_train_mses_d[key] for key in model_s_l]
+    test_mse_l = [all_test_mses_d[key] for key in model_s_l]
+    bar_width = 0.35
+    train_index_a = np.arange(len(train_mse_l))
+    test_index_a = np.arange(bar_width, len(test_mse_l)+bar_width)
     fig = plt.figure()
-    ax = fig.add_subplot(111) 
-    ax.bar(range(len(mse_l)), mse_l)
+    ax = fig.add_axes([0.1, 0.3, 0.8, 0.6]) 
+    ax.bar(train_index_a, train_mse_l, bar_width, color='r', label='Training')
+    ax.bar(test_index_a, test_mse_l, bar_width, color='b', label='Test')
     ax.set_title('Comparison of MSE of autoregression algorithms vs. controls')
-    ax.set_xticks(np.arange(len(mse_l)))
-    ax.set_xticklabels(model_s_l, rotation=45)
+    ax.set_xticks(np.arange(len(test_mse_l))+bar_width)
+    ax.set_xticklabels(model_s_l, rotation=90)
     ax.set_ylabel('Mean squared error')
-    ax.axhline(y=all_mses_d['mean_over_years_score_control'], color='r')
-    plt.savefig('mse_all_models.png')
-                   
-    ## {{{Then, save them all to a database.}}}
-                   
-                   
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12))
+    ax.axhline(y=all_test_mses_d['mean_over_years_score_control'], color='k')
+    plt.savefig(os.path.join(config.plot_path, 'mse_all_models.png'))
+               
+               
     ## Exploratory plots
     fig = plt.figure()
     ax = fig.add_subplot(111)                   
@@ -100,9 +104,8 @@ def main():
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
     ax.ticklabel_format(useOffset=False)
-    plt.savefig('all_schools.png')
+    plt.savefig(os.path.join(config.plot_path, 'all_schools.png'))
     
-    ## Exploratory plots
     significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 0.2)
     to_plot_a = data_a[significant_rising_la, :].transpose()
     fig = plt.figure()
@@ -112,9 +115,8 @@ def main():
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
     ax.ticklabel_format(useOffset=False)
-    plt.savefig('significant_rising.png')
+    plt.savefig(os.path.join(config.plot_path, 'significant_rising.png'))
     
-    ## Exploratory plots
     significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -0.2)
     to_plot_a = data_a[significant_falling_la, :].transpose()
     fig = plt.figure()
@@ -124,7 +126,19 @@ def main():
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
     ax.ticklabel_format(useOffset=False)
-    plt.savefig('significant_falling.png')
+    plt.savefig(os.path.join(config.plot_path, 'significant_falling.png'))
+    
+    
+    ## Save data to the SQL database
+    model_to_save_s = 'raw_lag1'
+    new_column_s_l = ['avg_fraction_passing_prediction_{:d}'.format(year) \
+                      for year in config.prediction_year_l]
+    prediction_df = pd.DataFrame(all_results_d[model_to_save_s]['prediction_a'],
+                                 index=data_no_na_df['ENTITY_CD'],
+                                 columns=new_column_s_l)
+    print(prediction_df)
+    utilities.write_to_sql_table(prediction_df,
+                                 'regents_pass_rate_prediction', 'joined')    
 
 
 
@@ -226,7 +240,7 @@ def find_mse(Y, prediction_Y):
 def fit_and_predict(array, Class, **kwargs):
     """ Given an array, fits it using Class and the optional options. """
     
-    num_years_to_predict = 3    
+    num_years_to_predict = len(config.prediction_year_l)    
     
     instance = Class()
     results_d = {}
