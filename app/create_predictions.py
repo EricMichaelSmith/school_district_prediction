@@ -30,7 +30,7 @@ def main():
     with con:
         cur = con.cursor()     
         field_s_l = ['ENTITY_CD'] + \
-            ['`AVG(percent_passing_{:d})`'.format(year) for year in config.year_l]
+            ['`AVG(fraction_passing_{:d})`'.format(year) for year in config.year_l]
         data_a = utilities.select_data(con, cur, field_s_l, 'regents_pass_rate',
                                   output_type='np_array')                          
     data_df = pd.DataFrame(data_a, columns=['ENTITY_CD'] + config.year_l)
@@ -50,15 +50,15 @@ def main():
     # Run autoregression with different lags on raw test scores
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
-        options_d = {'diff': False, 'lag': lag}
-        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression, options_d)
+        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
+                                                 diff=False, lag=lag)
     
     # Run autogression with different lags on diff of test scores w.r.t. year
     for lag in lag_l:
         model_s = 'diff_lag{:d}'.format(lag)
-        options_d = {'diff': True, 'lag': lag}
-        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression, options_d)
-        
+        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
+                                                 diff=True, lag=lag)
+
     # Run control: prediction is same as mean over years in training set
     model_s = 'mean_over_years_score_control'
     all_results_d[model_s] = fit_and_predict(data_a, MeanOverYears)
@@ -95,7 +95,7 @@ def main():
     ## Exploratory plots
     fig = plt.figure()
     ax = fig.add_subplot(111)                   
-    ax.plot(config.year_l, data_a.transpose())
+    ax.plot(config.year_l, data_a.transpose()*100)
     ax.set_xlabel('Year')
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
@@ -103,11 +103,11 @@ def main():
     plt.savefig('all_schools.png')
     
     ## Exploratory plots
-    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 20)
+    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 0.2)
     to_plot_a = data_a[significant_rising_la, :].transpose()
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(config.year_l, to_plot_a)
+    ax.plot(config.year_l, to_plot_a*100)
     ax.set_xlabel('Year')
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
@@ -115,11 +115,11 @@ def main():
     plt.savefig('significant_rising.png')
     
     ## Exploratory plots
-    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -20)
+    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -0.2)
     to_plot_a = data_a[significant_falling_la, :].transpose()
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(config.year_l, to_plot_a)
+    ax.plot(config.year_l, to_plot_a*100)
     ax.set_xlabel('Year')
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
     ax.set_ylim([0, 100])
@@ -133,15 +133,14 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, options_d):
+    def fit(self, raw_array, diff=False, lag=1):
         """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
 
         # Apply optional parameters
-        if options_d['diff']:
+        if diff:
             array = np.diff(raw_array, 1, axis=1)
         else:
             array = raw_array
-        lag = options_d['lag']
         
         # Create model and fit parameters
         Y = array[:, lag:].reshape(-1)
@@ -157,11 +156,10 @@ class AutoRegression(object):
         
         return results
         
-    def predict(self, raw_array, results, options_d):
+    def predict(self, raw_array, results, diff=False, lag=1):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
         
-        lag = options_d['lag']
-        if options_d['diff']:
+        if diff:
             array = np.diff(raw_array, 1, axis=1)
             X = array[:, -lag:]
             X = sm.add_constant(X)
@@ -182,10 +180,10 @@ class MeanOverYears(object):
     def __init__(self):
         pass
     
-    def fit(self, array, options_d=None):
+    def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, options_d=None):
+    def predict(self, array, results, **kwargs):
         mean_over_years_a = np.mean(array, axis=1)
         return mean_over_years_a.reshape((-1, 1))
 
@@ -196,10 +194,10 @@ class SameAsLastYear(object):
     def __init__(self):
         pass
     
-    def fit(self, array, options_d=None):
+    def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, options_d=None):
+    def predict(self, array, results, **kwargs):
         last_year_a = array[:, -1]
         return last_year_a.reshape((-1, 1))
         
@@ -210,10 +208,10 @@ class SameChangeAsLastYear(object):
     def __init__(self):
         pass
     
-    def fit(self, array, options_d=None):
+    def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, options_d=None):
+    def predict(self, array, results, **kwargs):
         change_over_last_year_a = array[:, -1] - array[:, -2]
         extrapolation_from_last_year_a = array[:, -1] + change_over_last_year_a
         return extrapolation_from_last_year_a.reshape((-1, 1))
@@ -225,7 +223,7 @@ def find_mse(Y, prediction_Y):
     
     
     
-def fit_and_predict(array, Class, options_d={}):
+def fit_and_predict(array, Class, **kwargs):
     """ Given an array, fits it using Class and the optional options. """
     
     num_years_to_predict = 3    
@@ -233,15 +231,15 @@ def fit_and_predict(array, Class, options_d={}):
     instance = Class()
     results_d = {}
         
-    results_d['result_object'] = instance.fit(array[:, :-1], options_d)
+    results_d['result_object'] = instance.fit(array[:, :-1], **kwargs)
     last_fitted_year_prediction_a = \
         instance.predict(array[:, :-2], results_d['result_object'],
-                         options_d)
+                         **kwargs)
     results_d['last_fitted_year_mse'] = find_mse(array[:, -2],
                                               last_fitted_year_prediction_a)
     last_data_year_prediction_a = \
         instance.predict(array[:, :-1], results_d['result_object'],
-                         options_d)
+                         **kwargs)
     results_d['last_data_year_mse'] = find_mse(array[:, -1],
                                             last_data_year_prediction_a)    
     future_prediction_a = np.ndarray((array.shape[0], 0))
@@ -249,7 +247,7 @@ def fit_and_predict(array, Class, options_d={}):
         combined_data_a = np.concatenate((array, future_prediction_a), axis=1)
         new_year_prediction_a = instance.predict(combined_data_a,
                                                  results_d['result_object'],
-                                                 options_d)
+                                                 **kwargs)
         future_prediction_a = np.concatenate((future_prediction_a,
                                               new_year_prediction_a), axis=1)
     results_d['prediction_a'] = future_prediction_a

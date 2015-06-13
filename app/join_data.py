@@ -106,11 +106,18 @@ SET fraction_passing_{0:d} = `65-100` / Tested;"""
     if year >= 2006:
         command_s = """CREATE TABLE temp{0:d}_filtered
 SELECT ENTITY_CD_{0:d}, SUBJECT_{0:d}, fraction_passing_{0:d} FROM temp{0:d}
-WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
+WHERE YEAR = {0:d}
+AND SUBGROUP_NAME = 'General Education'
+AND ENTITY_CD_{0:d} NOT LIKE '%0000'
+AND ENTITY_CD_{0:d} NOT LIKE '00000000000%'
+AND ENTITY_CD_{0:d} != '111111111111';"""
     else:
         command_s = """CREATE TABLE temp{0:d}_filtered
 SELECT ENTITY_CD_{0:d}, SUBJECT_{0:d}, fraction_passing_{0:d} FROM temp{0:d}
-WHERE YEAR = {0:d};"""
+WHERE YEAR = {0:d}
+AND ENTITY_CD_{0:d} NOT LIKE '%0000'
+AND ENTITY_CD_{0:d} NOT LIKE '00000000000%'
+AND ENTITY_CD_{0:d} != '111111111111';"""
     cur.execute(command_s.format(year))
     command_s = 'DROP TABLE IF EXISTS temp{0:d}_averaged;'
     cur.execute(command_s.format(year))
