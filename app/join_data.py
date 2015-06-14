@@ -14,7 +14,7 @@ def main():
     
     find_school_key()    
     
-    Database_l = [RegentsPassRate]
+    Database_l = [RegentsPassRate, TurnoverRate]
     for Database in Database_l:
         instance = Database()
         con = utilities.connect_to_sql('temp')    
@@ -44,7 +44,12 @@ def find_school_key():
         cur.execute(command_s)
         command_s = """CREATE TABLE school_key
 SELECT ENTITY_CD, ENTITY_NAME FROM SRC{0:d}.`{1}`
-WHERE YEAR = {0:d} AND SUBJECT = 'REG_ENG' AND SUBGROUP_NAME = 'General Education'"""
+WHERE YEAR = {0:d}
+AND SUBJECT = 'REG_ENG'
+AND SUBGROUP_NAME = 'General Education'
+AND ENTITY_CD_{0:d} NOT LIKE '%0000'
+AND ENTITY_CD_{0:d} NOT LIKE '00000000000%'
+AND ENTITY_CD_{0:d} != '111111111111'"""
         # The REG_ENG is kind of a hack
         instance = RegentsPassRate()
         command_s = command_s.format(config.year_l[-1],
@@ -53,8 +58,29 @@ WHERE YEAR = {0:d} AND SUBJECT = 'REG_ENG' AND SUBGROUP_NAME = 'General Educatio
         command_s = """ALTER TABLE school_key
 ADD INDEX ENTITY_CD (ENTITY_CD)"""
         cur.execute(command_s)
+        
+        
+        
+def join_years(cur, new_table_s):
+    """ Join separate years of a database that was just extracted into the temp database """
     
-
+    print('Starting join_years for {0}'.format(new_table_s))
+    
+    cur.execute('DROP TABLE IF EXISTS {0}'.format(new_table_s))
+    command_s = """CREATE TABLE {0}
+SELECT * FROM school_key""".format(new_table_s)
+    for year in config.year_l:
+        this_table_command_s = """
+INNER JOIN temp.temp{0:d}_final
+ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
+        this_table_command_s = this_table_command_s.format(year)
+        command_s += this_table_command_s
+    command_s += ';'
+    cur.execute(command_s)
+    
+    print('Database {0} created.'.format(new_table_s))
+    
+    
 
 class RegentsPassRate(object):
     
@@ -160,26 +186,45 @@ CHANGE `AVG(fraction_passing_{0:d})` {1}_{0:d} FLOAT;"""
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
         
-
-
-def join_years(cur, new_table_s):
-    """ Join separate years of a database that was just extracted into the temp database """
+        
+        
+class TurnoverRate(object):
+    """ Turnover rate of all teachers """
     
-    print('Starting join_years for {0}'.format(new_table_s))
-    
-    cur.execute('DROP TABLE IF EXISTS {0}'.format(new_table_s))
-    command_s = """CREATE TABLE {0}
-SELECT * FROM school_key""".format(new_table_s)
-    for year in config.year_l:
-        this_table_command_s = """
-INNER JOIN temp.temp{0:d}_final
-ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
-        this_table_command_s = this_table_command_s.format(year)
-        command_s += this_table_command_s
-    command_s += ';'
-    cur.execute(command_s)
-    
-    print('Database {0} created.'.format(new_table_s))
+    def __init__(self):
+        self.new_table_s = 'turnover_rate'
+        self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-3 of the ENTITY_CD, SUBJECT, and turnover rate """
+        
+        assert(year >= 2007)        
+        
+        print('Starting {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE PER_TURN_ALL = 's' OR PER_TURN_ALL IS NULL;"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d}
+SET {1}_{0:d} = PER_TURN_ALL / 100;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+            
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_filtered;'
+        cur.execute(command_s.format(year))
+        print('Starting to filter for year {:d}'.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
             
             
 
