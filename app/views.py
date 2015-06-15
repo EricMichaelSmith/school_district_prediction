@@ -8,7 +8,10 @@ import StringIO
 
 import config
 
-db= mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
+db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
+
+primary_feature_s = 'regents_pass_rate'
+plot_label_s = 'Percent passing Regents Exams\n(averaged over subjects)'
 
 
 
@@ -22,14 +25,14 @@ def schools_input():
 
 @app.route('/output')
 def schools_output():
-    #pull 'ID1' and 'ID1' from input field and store them
-    ID1 = request.args.get('ID1')
-    ID2 = request.args.get('ID2')
+    #pull 'Name1' and 'Name2' from input field and store them
+    Name1 = request.args.get('Name1')
+    Name2 = request.args.get('Name2')
 
-    schools1_past = query_past_scores(ID1)
-    schools1_prediction = query_prediction_scores(ID1)
-    schools2_past = query_past_scores(ID2)
-    schools2_prediction = query_prediction_scores(ID2) 
+    schools1_past = query_past_scores(name=Name1)
+    schools1_prediction = query_prediction_scores(ID=schools1_past[0]['school_id'])
+    schools2_past = query_past_scores(name=Name2)
+    schools2_prediction = query_prediction_scores(ID=schools2_past[0]['school_id']) 
     school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
         schools2_prediction[0]['score_l'][-1]
     num_years_prediction = len(schools1_prediction[0]['score_l'])
@@ -63,10 +66,10 @@ def plot():
     ID1 = request.args.get('ID1')
     ID2 = request.args.get('ID2')
     
-    schools1_past = query_past_scores(ID1)
-    schools1_prediction = query_prediction_scores(ID1)
-    schools2_past = query_past_scores(ID2)
-    schools2_prediction = query_prediction_scores(ID2)        
+    schools1_past = query_past_scores(ID=ID1)
+    schools1_prediction = query_prediction_scores(ID=ID1)
+    schools2_past = query_past_scores(ID=ID2)
+    schools2_prediction = query_prediction_scores(ID=ID2)        
 
     fig = plt.Figure()
     axis = fig.add_axes([0.1, 0.23, 0.8, 0.67])
@@ -82,7 +85,7 @@ def plot():
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
               np.array(schools2_extrapolation_l)*100, 'b--')
     axis.set_xlabel('Year')
-    axis.set_title('Percent passing Regents Exams\n(averaged over subjects)')
+    axis.set_title(plot_label_s)
     axis.ticklabel_format(useOffset=False)
     axis.legend([curve1, curve2], [schools1_past[0]['name'], schools2_past[0]['name']],
                 loc='upper center', bbox_to_anchor=(0.5, -0.12))
@@ -95,16 +98,20 @@ def plot():
     
     
 
-def query_past_scores(ID):
+def query_past_scores(ID=None, name=None):
     with db:
         cur = db.cursor()
-        #just select the city from 'joined' that the user inputs
+        #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
         for year in config.year_l:
-            command_s += '`AVG(fraction_passing_{:d})`, '.format(year)
+            command_s += '{0}_{1:d}, '.format(primary_feature_s, year)
         command_s = command_s[:-2]
-        command_s += " FROM regents_pass_rate WHERE ENTITY_CD='{0}';"
-        cur.execute(command_s.format(ID))
+        if ID:
+            command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)            
+        elif name:
+            command_s += " FROM master WHERE ENTITY_NAME LIKE '{0}%';"\
+                .format(name.upper())
+        cur.execute(command_s)
         query_results = cur.fetchall()
 
     schools = []
@@ -119,12 +126,14 @@ def query_past_scores(ID):
 def query_prediction_scores(ID):
     with db:
         cur = db.cursor()
-        #just select the city from 'joined' that the user inputs
+        #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, '
         for year in config.prediction_year_l:
-            command_s += 'avg_fraction_passing_prediction_{:d}, '.format(year)
+            command_s += '{0}_prediction_{1:d}, '.format(primary_feature_s,
+                                                           year)
         command_s = command_s[:-2]
-        command_s += " FROM regents_pass_rate_prediction WHERE ENTITY_CD='{0}';"
+        command_s += " FROM {0}_prediction WHERE ENTITY_CD='{1}';"\
+            .format(primary_feature_s, ID)
         cur.execute(command_s.format(ID))
         query_results = cur.fetchall()
 

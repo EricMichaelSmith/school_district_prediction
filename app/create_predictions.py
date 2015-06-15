@@ -25,9 +25,6 @@ reload(utilities)
 
 def main():
     
-    PrimaryFeature = join_data.RegentsPassRate()
-    primary_feature_s = PrimaryFeature.new_table_s
-    
     
     ## Read in data    
     con = utilities.connect_to_sql('joined')
@@ -148,11 +145,13 @@ def main():
     
     ## Save data to the SQL database
     model_to_save_s = 'raw_lag1'
-    new_column_s_l = ['{0}_prediction_{1:d}'.format(primary_feature_s, year) \
-                      for year in config.prediction_year_l]
-    prediction_df = pd.DataFrame(all_results_d[model_to_save_s]['prediction_a'],
-                                 index=raw_data_a[:, 0],
-                                 columns=new_column_s_l)
+    new_column_s_l = ['ENTITY_CD'] + \
+        ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
+         for year in config.prediction_year_l]
+    prediction_a = np.concatenate((raw_data_a[:, 0].reshape(-1, 1),
+                                   all_results_d[model_to_save_s]['prediction_a']),
+                                  axis=1)
+    prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
     utilities.write_to_sql_table(prediction_df,
                                  '{0}_prediction'.format(primary_feature_s), 'joined')    
 
@@ -258,7 +257,6 @@ class AutoRegression(object):
                     array = raw_array
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
-            print(X.shape)
             prediction_a = results.predict(X)            
             
         return prediction_a.reshape((-1, 1))
@@ -344,6 +342,11 @@ def fit_and_predict(array, Class, **kwargs):
     results_d['prediction_a'] = future_prediction_a
     
     return results_d
+    
+    
+    
+PrimaryFeature = join_data.RegentsPassRate()
+primary_feature_s = PrimaryFeature.new_table_s
     
     
     
