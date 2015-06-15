@@ -91,7 +91,6 @@ ON school_key.ENTITY_CD = {0}.ENTITY_CD_{0}"""
         this_table_command_s = this_table_command_s.format(individual_database_s)
         command_s += this_table_command_s
     command_s += ';'
-    print(command_s)
     cur.execute(command_s)
     
     print('Database {0} created.'.format(master_database_s))
@@ -103,7 +102,7 @@ def join_years(cur, new_table_s):
     
     print('Starting join_years for {0}'.format(new_table_s))
     
-    cur.execute('DROP TABLE IF EXISTS {0}'.format(new_table_s))
+    cur.execute('DROP TABLE IF EXISTS {0};'.format(new_table_s))
     command_s = """CREATE TABLE {0}
 SELECT * FROM school_key""".format(new_table_s)
     for year in config.year_l:
@@ -114,7 +113,7 @@ ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
         command_s += this_table_command_s
     command_s += ';'
     cur.execute(command_s)
-    command_s = """ALTER TABLE {0} CHANGE ENTITY_CD ENTITY_CD_{0} CHAR(12)"""
+    command_s = """ALTER TABLE {0} CHANGE ENTITY_CD ENTITY_CD_{0} CHAR(12);"""
     cur.execute(command_s.format(new_table_s))
     
     print('Database {0} created.'.format(new_table_s))
@@ -162,12 +161,52 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
         
         
+
+class EighthELAScore(object):
+    """ Mean score on 8th grade English exams """
+    
+    def __init__(self):
+        self.new_table_s = 'eighth_ela_score'
+        self.orig_table_s_d = {year:'ELA8 Subgroup Results' for year in range(2007, 2015)}
         
-class Math8Score(object):
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = MEAN_SCORE;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+
+class EighthMathScore(object):
     """ Mean score on 8th grade math exams """
     
     def __init__(self):
-        self.new_table_s = 'math_8_score'
+        self.new_table_s = 'eighth_math_score'
         self.orig_table_s_d = {year:'Math8 Subgroup Results' for year in range(2007, 2015)}
         
     def extract(self, cur, year):
@@ -179,7 +218,8 @@ class Math8Score(object):
         
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
-        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
 WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
@@ -190,7 +230,46 @@ WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
         cur.execute(command_s.format(year, self.new_table_s))
         command_s = """UPDATE temp{0:d} SET {1}_{0:d} = MEAN_SCORE;"""
         cur.execute(command_s.format(year, self.new_table_s))
-            
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
+class EighthScienceScore(object):
+    """ Mean score on 8th grade science exams """
+    
+    def __init__(self):
+        self.new_table_s = 'eighth_science_score'
+        self.orig_table_s_d = {year:'Science8 Subgroup Results' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = MEAN_SCORE;"""
+        cur.execute(command_s.format(year, self.new_table_s))
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d}_final
@@ -350,7 +429,8 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         
         
         
-Database_l = [RegentsPassRate, DiscountLunch, Math8Score, TurnoverRate]
+Database_l = [DiscountLunch, EighthELAScore, EighthMathScore, EighthScienceScore,
+              RegentsPassRate, TurnoverRate]
         
             
 

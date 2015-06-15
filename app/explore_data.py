@@ -32,7 +32,7 @@ def plot_cross_correlations(plot_data_a_d, plot_name):
     """ Plot the cross-correlations of all features, averaged over schools. """
     
     feature_s_l = sorted(plot_data_a_d.keys())
-    fig = plt.figure()
+    fig = plt.figure(figsize=(2*len(feature_s_l), 2*len(feature_s_l)))
     for i, feature_i_s in enumerate(feature_s_l):
         for j, feature_j_s in enumerate(feature_s_l):
             xcorr_a = np.ndarray((plot_data_a_d[feature_i_s].shape[0],

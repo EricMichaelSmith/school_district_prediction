@@ -107,6 +107,7 @@ def main():
     ax.set_ylabel('Mean squared error')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12))
     ax.axhline(y=all_test_mses_d['mean_over_years_score_control'], color='k')
+    ax.set_ylim([0, 1.5*all_test_mses_d['mean_over_years_score_control']])
     plt.savefig(os.path.join(config.plot_path, 'mse_all_models.png'))
                
                
@@ -307,7 +308,7 @@ class SameChangeAsLastYear(object):
         
         
 def find_mse(Y, prediction_Y):
-    return np.sum((Y - prediction_Y)**2)
+    return np.mean((Y - prediction_Y)**2)
     
     
     
