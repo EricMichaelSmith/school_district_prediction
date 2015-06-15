@@ -51,14 +51,12 @@ def main():
 
     
     ## Format data
-    data_no_nan_a = raw_data_a[~np.isnan(np.min(raw_data_a, axis=1)), :]
-    # Delete NaN values, currently (as of 2007--2014 data) only from Greenburgh Eleven Union Free School / Greenburgh Eleven High School (660411020000 and 04)
-    data_a = data_no_nan_a[:, 1:]
+    data_a = raw_data_a[:, 1:]
+    print(data_a.shape[0])
     # Drop the ENTITY_CD column
     for feature_s in aux_data_a_d.iterkeys():
-        no_nan_a = aux_data_a_d[feature_s]\
-            [~np.isnan(np.min(aux_data_a_d[feature_s], axis=1)), :]
-        aux_data_a_d[feature_s] = no_nan_a[:, 1:]
+        aux_data_a_d[feature_s] = aux_data_a_d[feature_s][:, 1:]
+        print(aux_data_a_d[feature_s].shape[0])
     
     
     ## Run regression models, validate and predict future scores, and run controls    
@@ -155,7 +153,7 @@ def main():
     new_column_s_l = ['{0}_prediction_{1:d}'.format(primary_feature_s, year) \
                       for year in config.prediction_year_l]
     prediction_df = pd.DataFrame(all_results_d[model_to_save_s]['prediction_a'],
-                                 index=data_no_nan_a[:, 0],
+                                 index=raw_data_a[:, 0],
                                  columns=new_column_s_l)
     utilities.write_to_sql_table(prediction_df,
                                  '{0}_prediction'.format(primary_feature_s), 'joined')    
