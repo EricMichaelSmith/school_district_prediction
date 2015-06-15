@@ -17,7 +17,7 @@ def connect_to_sql(database_s):
     
 
 
-def select_data(con, cur, field_s_l, table_s, output_type='dictionary'):
+def select_data(con, cur, field_s_l, table_s, output_type='np_array'):
     """
     Selects fields specified in field_s_l from table table_s; returns a dictionary where each field is a key.
     """
@@ -31,7 +31,7 @@ def select_data(con, cur, field_s_l, table_s, output_type='dictionary'):
     cur.execute(command_s)
     output_t_t = cur.fetchall()
     
-    # Convert to appropriate type            
+    # Convert to appropriate type
     if output_type == 'np_array':
         
         fields = np.ndarray(shape=(len(output_t_t), len(field_s_l)))

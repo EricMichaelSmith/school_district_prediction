@@ -121,6 +121,88 @@ ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
     
     
 
+class DiscountLunch(object):
+    """ Fraction of students receiving reduced or free lunch """
+    
+    def __init__(self):
+        self.new_table_s = 'discount_lunch'
+        self.orig_table_s_d = {year:'Demographic Factors' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE PER_FREE_LUNCH = 's' OR PER_FREE_LUNCH IS NULL
+OR PER_REDUCED_LUNCH = 's' OR PER_REDUCED_LUNCH IS NULL;"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d}
+SET {1}_{0:d} = (PER_FREE_LUNCH + PER_REDUCED_LUNCH) / 100;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+            
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
+class Math8Score(object):
+    """ Mean score on 8th grade math exams """
+    
+    def __init__(self):
+        self.new_table_s = 'math_8_score'
+        self.orig_table_s_d = {year:'Math8 Subgroup Results' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = MEAN_SCORE;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+            
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+
+
 class RegentsPassRate(object):
     
     def __init__(self):
@@ -235,7 +317,7 @@ class TurnoverRate(object):
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
         
     def extract(self, cur, year):
-        """ Returns an N-by-3 of the ENTITY_CD, SUBJECT, and turnover rate """
+        """ Returns an N-by-2 of the ENTITY_CD and value """
         
         assert(year >= 2007)        
         
@@ -266,7 +348,9 @@ WHERE YEAR = {0:d};"""
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
         
-Database_l = [RegentsPassRate, TurnoverRate]
+        
+        
+Database_l = [RegentsPassRate, DiscountLunch, Math8Score, TurnoverRate]
         
             
 
