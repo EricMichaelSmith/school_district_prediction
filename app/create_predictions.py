@@ -52,11 +52,9 @@ def main():
     
     ## Format data
     data_a = raw_data_a[:, 1:]
-    print(data_a.shape[0])
     # Drop the ENTITY_CD column
     for feature_s in aux_data_a_d.iterkeys():
         aux_data_a_d[feature_s] = aux_data_a_d[feature_s][:, 1:]
-        print(aux_data_a_d[feature_s].shape[0])
     
     
     ## Run regression models, validate and predict future scores, and run controls    
@@ -189,10 +187,12 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, aux_data_a_d=None, diff=False, lag=1):
-        """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1):
+        """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the fitting, which is ideal for training the algorithm. """
 
         # Apply optional parameters
+        if holdout_col > 0:
+            raw_array = raw_array[:, :-holdout_col]
         if diff:
             array = np.diff(raw_array, 1, axis=1)
         else:
@@ -206,10 +206,14 @@ class AutoRegression(object):
             # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
         if aux_data_a_d:
             for feature_s in aux_data_a_d.iterkeys():
-                if diff:
-                    array = np.diff(aux_data_a_d[feature_s], 1, axis=1)
+                if holdout_col > 0:
+                    raw_array = aux_data_a_d[feature_s][:, :-holdout_col]
                 else:
-                    array = aux_data_a_d[feature_s]
+                    raw_array = aux_data_a_d[feature_s]
+                if diff:
+                    array = np.diff(raw_array, 1, axis=1)
+                else:
+                    array = raw_array
                 for i in range(lag):
                     X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
         X = sm.add_constant(X)
@@ -221,27 +225,40 @@ class AutoRegression(object):
         
         return results
         
-    def predict(self, raw_array, results, aux_data_a_d=None, diff=False, lag=1):
-        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
+    def predict(self, raw_array, results, aux_data_a_d=None, diff=False,
+                holdout_col=0, lag=1):
+        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
         
+        if holdout_col > 0:
+            raw_array = raw_array[:, :-holdout_col]
+        prediction_raw_array = raw_array
         if diff:
             array = np.diff(raw_array, 1, axis=1)
             X = array[:, -lag:]
             if aux_data_a_d:
                 for feature_s in aux_data_a_d.iterkeys():
-                    array = np.diff(aux_data_a_d[feature_s], 1, axis=1)
+                    if holdout_col > 0:
+                        raw_array = aux_data_a_d[feature_s][:, :-holdout_col]
+                    else:
+                        raw_array = aux_data_a_d[feature_s]
+                    array = np.diff(raw_array, 1, axis=1)
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
             predicted_change_a = results.predict(X)
-            prediction_a = raw_array[:, -1] + predicted_change_a
+            prediction_a = prediction_raw_array[:, -1] + predicted_change_a
         else:
             array = raw_array
             X = array[:, -lag:]
             if aux_data_a_d:
                 for feature_s in aux_data_a_d.iterkeys():
-                    array = aux_data_a_d[feature_s]
+                    if holdout_col > 0:
+                        raw_array = aux_data_a_d[feature_s][:, :-holdout_col]
+                    else:
+                        raw_array = aux_data_a_d[feature_s]
+                    array = raw_array
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
+            print(X.shape)
             prediction_a = results.predict(X)            
             
         return prediction_a.reshape((-1, 1))
@@ -304,15 +321,16 @@ def fit_and_predict(array, Class, **kwargs):
     instance = Class()
     results_d = {}
         
-    results_d['result_object'] = instance.fit(array[:, :-1], **kwargs)
+    results_d['result_object'] = instance.fit(array, holdout_col=1,
+                                              **kwargs)
     last_fitted_year_prediction_a = \
-        instance.predict(array[:, :-2], results_d['result_object'],
-                         **kwargs)
+        instance.predict(array, results_d['result_object'],
+                         holdout_col=2, **kwargs)
     results_d['last_fitted_year_mse'] = find_mse(array[:, -2],
                                               last_fitted_year_prediction_a)
     last_data_year_prediction_a = \
-        instance.predict(array[:, :-1], results_d['result_object'],
-                         **kwargs)
+        instance.predict(array, results_d['result_object'],
+                         holdout_col=1, **kwargs)
     results_d['last_data_year_mse'] = find_mse(array[:, -1],
                                             last_data_year_prediction_a)    
     future_prediction_a = np.ndarray((array.shape[0], 0))
