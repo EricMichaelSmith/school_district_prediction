@@ -37,7 +37,7 @@ def main():
             ['{0}_{1:d}'.format(primary_feature_s, year) for year in config.year_l]
         raw_data_a = utilities.select_data(con, cur, field_s_l, 'master',
                                   output_type='np_array')
-        aux_data_a_l = []
+        aux_data_a_d = {}
         aux_Database_l = join_data.Database_l
         for Database in aux_Database_l:
             Instance = Database()
@@ -45,8 +45,9 @@ def main():
             if feature_s != primary_feature_s:
                 field_s_l = ['ENTITY_CD'] + \
                     ['{0}_{1:d}'.format(feature_s, year) for year in config.year_l]
-                aux_data_a_l.append(utilities.select_data(con, cur, field_s_l, 'master',
-                                                          output_type='np_array'))
+                aux_data_a_d[feature_s] = utilities.select_data(con, cur, field_s_l,
+                                                                'master',
+                                                                output_type='np_array')
 
     
     ## Format data
@@ -54,6 +55,10 @@ def main():
     # Delete NaN values, currently (as of 2007--2014 data) only from Greenburgh Eleven Union Free School / Greenburgh Eleven High School (660411020000 and 04)
     data_a = data_no_nan_a[:, 1:]
     # Drop the ENTITY_CD column
+    for feature_s in aux_data_a_d.iterkeys():
+        no_nan_a = aux_data_a_d[feature_s]\
+            [~np.isnan(np.min(aux_data_a_d[feature_s], axis=1)), :]
+        aux_data_a_d[feature_s] = no_nan_a[:, 1:]
     
     
     ## Run regression models, validate and predict future scores, and run controls    
@@ -64,12 +69,14 @@ def main():
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
         all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
+                                                 aux_data_a_d=aux_data_a_d,
                                                  diff=False, lag=lag)
     
     # Run autogression with different lags on diff of test scores w.r.t. year
     for lag in lag_l:
         model_s = 'diff_lag{:d}'.format(lag)
         all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
+                                                 aux_data_a_d=aux_data_a_d,
                                                  diff=True, lag=lag)
 
     # Run control: prediction is same as mean over years in training set
@@ -184,7 +191,7 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, diff=False, lag=1):
+    def fit(self, raw_array, aux_data_a_d=None, diff=False, lag=1):
         """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
 
         # Apply optional parameters
@@ -198,8 +205,17 @@ class AutoRegression(object):
         X = np.ndarray((Y.shape[0], 0))
         for i in range(lag):
             X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
+            # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
+        if aux_data_a_d:
+            for feature_s in aux_data_a_d.iterkeys():
+                if diff:
+                    array = np.diff(aux_data_a_d[feature_s], 1, axis=1)
+                else:
+                    array = aux_data_a_d[feature_s]
+                for i in range(lag):
+                    X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
         X = sm.add_constant(X)
-        # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
+        
         model = sm.OLS(Y, X)
         results = model.fit()
         print('Lag of {0:d}:'.format(lag))
@@ -207,18 +223,26 @@ class AutoRegression(object):
         
         return results
         
-    def predict(self, raw_array, results, diff=False, lag=1):
+    def predict(self, raw_array, results, aux_data_a_d=None, diff=False, lag=1):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
         
         if diff:
             array = np.diff(raw_array, 1, axis=1)
             X = array[:, -lag:]
+            if aux_data_a_d:
+                for feature_s in aux_data_a_d.iterkeys():
+                    array = np.diff(aux_data_a_d[feature_s], 1, axis=1)
+                    X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
             predicted_change_a = results.predict(X)
             prediction_a = raw_array[:, -1] + predicted_change_a
         else:
             array = raw_array
             X = array[:, -lag:]
+            if aux_data_a_d:
+                for feature_s in aux_data_a_d.iterkeys():
+                    array = aux_data_a_d[feature_s]
+                    X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
             prediction_a = results.predict(X)            
             
