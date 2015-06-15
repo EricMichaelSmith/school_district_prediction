@@ -14,7 +14,6 @@ def main():
     
     find_school_key()    
     
-    Database_l = [RegentsPassRate, TurnoverRate]
     for Database in Database_l:
         instance = Database()
         con = utilities.connect_to_sql('temp')    
@@ -266,7 +265,9 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-            
+        
+Database_l = [RegentsPassRate, TurnoverRate]
+        
             
 
 if __name__ == '__main__':

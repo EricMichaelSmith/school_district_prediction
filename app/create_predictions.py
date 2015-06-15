@@ -16,6 +16,8 @@ import statsmodels.api as sm
 
 import config
 reload(config)
+import join_data
+reload(join_data)
 import utilities
 reload(utilities)
 
@@ -23,26 +25,38 @@ reload(utilities)
 
 def main():
     
+    PrimaryFeature = join_data.RegentsPassRate()
+    primary_feature_s = PrimaryFeature.new_table_s
     
-    ## Read in data
+    
+    ## Read in data    
     con = utilities.connect_to_sql('joined')
     with con:
-        cur = con.cursor()     
+        cur = con.cursor() 
         field_s_l = ['ENTITY_CD'] + \
-            ['`AVG(fraction_passing_{:d})`'.format(year) for year in config.year_l]
-        data_a = utilities.select_data(con, cur, field_s_l, 'regents_pass_rate',
-                                  output_type='np_array')                          
-    data_df = pd.DataFrame(data_a, columns=['ENTITY_CD'] + config.year_l)
-    to_string = lambda x: '{:012.0f}'.format(x)
-    data_df['ENTITY_CD'] = data_df['ENTITY_CD'].map(to_string)
+            ['{0}_{1:d}'.format(primary_feature_s, year) for year in config.year_l]
+        raw_data_a = utilities.select_data(con, cur, field_s_l, 'master',
+                                  output_type='np_array')
+        aux_data_a_l = []
+        aux_Database_l = join_data.Database_l
+        for Database in aux_Database_l:
+            Instance = Database()
+            feature_s = Instance.new_table_s
+            if feature_s != primary_feature_s:
+                field_s_l = ['ENTITY_CD'] + \
+                    ['{0}_{1:d}'.format(feature_s, year) for year in config.year_l]
+                aux_data_a_l.append(utilities.select_data(con, cur, field_s_l, 'master',
+                                                          output_type='np_array'))
+
+    
+    ## Format data
+    data_no_nan_a = raw_data_a[~np.isnan(np.min(raw_data_a, axis=1)), :]
+    # Delete NaN values, currently (as of 2007--2014 data) only from Greenburgh Eleven Union Free School / Greenburgh Eleven High School (660411020000 and 04)
+    data_a = data_no_nan_a[:, 1:]
+    # Drop the ENTITY_CD column
     
     
     ## Run regression models, validate and predict future scores, and run controls    
-    data_no_na_df = data_df.dropna()
-    # Delete NaN values, currently (as of 2007--2014 data) only from Greenburgh Eleven Union Free School / Greenburgh Eleven High School (660411020000 and 04)    
-    data_a = data_no_na_df.iloc[:, 1:].as_matrix()
-    # Take out ENTITY_CD so that all columns are test scores    
-    
     all_results_d = {}
     lag_l = range(1, 6)
     
@@ -131,13 +145,13 @@ def main():
     
     ## Save data to the SQL database
     model_to_save_s = 'raw_lag1'
-    new_column_s_l = ['avg_fraction_passing_prediction_{:d}'.format(year) \
+    new_column_s_l = ['{0}_prediction_{1:d}'.format(primary_feature_s, year) \
                       for year in config.prediction_year_l]
     prediction_df = pd.DataFrame(all_results_d[model_to_save_s]['prediction_a'],
-                                 index=data_no_na_df['ENTITY_CD'],
+                                 index=data_no_nan_a[:, 0],
                                  columns=new_column_s_l)
     utilities.write_to_sql_table(prediction_df,
-                                 'regents_pass_rate_prediction', 'joined')    
+                                 '{0}_prediction'.format(primary_feature_s), 'joined')    
 
 
 
