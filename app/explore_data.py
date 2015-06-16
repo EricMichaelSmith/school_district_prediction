@@ -24,7 +24,7 @@ def main():
     
     plot_feature_histograms()
     plot_cross_correlations_wrapper()
-    plot_cross_correlations_control_wrapper()
+#    plot_cross_correlations_control_wrapper()
     
     
 
@@ -41,6 +41,8 @@ def plot_cross_correlations(plot_data_a_d, plot_name):
                 xcorr_a[k_row, :] = np.correlate(plot_data_a_d[feature_i_s][k_row, :],
                                               plot_data_a_d[feature_j_s][k_row, :],
                                               mode='full')
+            xcorr_a = xcorr_a[~np.any(np.isnan(xcorr_a), axis=1), :]
+            print('{0} and {1}: {2:d} schools'.format(feature_i_s, feature_j_s, xcorr_a.shape[0]))
             plot_number = len(feature_s_l)*i + j + 1
             ax = fig.add_subplot(len(feature_s_l), len(feature_s_l), plot_number)
             ax.plot(np.mean(xcorr_a, axis=0))
@@ -89,11 +91,14 @@ def plot_feature_histograms():
             raw_data_a = utilities.select_data(con, cur, field_s_l, 'master',
                                       output_type='np_array')
             data_a = raw_data_a[:, 1:]
-            
+            valid_la = ~np.isnan(data_a)
+                        
             fig = plt.figure()
             ax = fig.add_subplot(111)
             for i, year in enumerate(config.year_l):
-                ax.hist(data_a[:, i], bins=20, color=config.year_plot_color_d[year],
+                col_a = data_a[:, i]
+                ax.hist(col_a[valid_la[:, i]], bins=20,
+                        color=config.year_plot_color_d[year],
                         histtype='step')
             ax.set_xlabel(database_s)
             ax.set_ylabel('Frequency')

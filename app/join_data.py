@@ -3,6 +3,10 @@
 Join all data in SQL databases
 """
 
+import os
+import pandas as pd
+
+
 import config
 reload(config)
 import utilities
@@ -12,27 +16,33 @@ reload(utilities)
 
 def main():
     
-    find_school_key()    
-    
-    for Database in Database_l:
-        instance = Database()
-        con = utilities.connect_to_sql('temp')    
-        with con:
-            cur = con.cursor()
-
-            for year in config.year_l:
-                instance.extract(cur, year)
-
-        con = utilities.connect_to_sql('joined')
-        with con:
-            cur = con.cursor()
-
-            join_years(cur, instance.new_table_s)
+#    find_school_key()    
+#    
+#    for Database in Database_l:
+#        instance = Database()
+#        con = utilities.connect_to_sql('temp')    
+#        with con:
+#            cur = con.cursor()
+#            for year in config.year_l:
+#                instance.extract(cur, year)
+#        con = utilities.connect_to_sql('joined')
+#        with con:
+#            cur = con.cursor()
+#            join_years(cur, instance.new_table_s)
             
-    con = utilities.connect_to_sql('joined')
-    with con:
-        cur = con.cursor()
-        join_databases(cur, Database_l)
+    for Database in DistrictDatabase_l:
+        instance = Database()
+        for year in config.year_l:
+            instance.extract(year)
+        con = utilities.connect_to_sql('joined')
+#        with con:
+#            cur = con.cursor()
+#            join_district_years(cur, instance.new_table_s)
+#            
+#    con = utilities.connect_to_sql('joined')
+#    with con:
+#        cur = con.cursor()
+#        join_databases(cur, Database_l)
 
 
 
@@ -57,11 +67,17 @@ AND SUBJECT = 'REG_ENG'
 AND SUBGROUP_NAME = 'General Education'
 AND ENTITY_CD NOT LIKE '%0000'
 AND ENTITY_CD NOT LIKE '00000000000%'
-AND ENTITY_CD != '111111111111'"""
-        # The REG_ENG is kind of a hack
+AND ENTITY_CD != '111111111111'
+AND ENTITY_CD != '240901040001'
+AND ENTITY_CD != '241001060003'"""
+        # The REG_ENG is kind of a hack; and I had to remove 240901040001 and 241001060003 because the rows were multiplying exponentially in the database like a virus
         instance = RegentsPassRate()
         command_s = command_s.format(config.year_l[-1],
                                      instance.orig_table_s_d[config.year_l[-1]])
+        cur.execute(command_s)
+        command_s = """ALTER TABLE school_key ADD district CHAR(6)"""
+        cur.execute(command_s)
+        command_s = """UPDATE school_key SET district = SUBSTRING(ENTITY_CD, 1, 6);"""
         cur.execute(command_s)
         command_s = """ALTER TABLE school_key
 ADD INDEX ENTITY_CD (ENTITY_CD)"""
@@ -82,7 +98,7 @@ def join_databases(cur, Database_l):
 SELECT * FROM school_key""".format(master_database_s)
     for individual_database_s in individual_database_s_l:
         this_table_command_s = """
-INNER JOIN (SELECT ENTITY_CD_{0}, """.format(individual_database_s)
+LEFT JOIN (SELECT ENTITY_CD_{0}, """.format(individual_database_s)
         for year in config.year_l:
             this_table_command_s += '{0}_{1:d}, '.format(individual_database_s, year)
         this_table_command_s = this_table_command_s[:-2]
@@ -119,6 +135,28 @@ ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
     print('Database {0} created.'.format(new_table_s))
     
     
+    
+class Budget(object):
+    """ Yearly budget """
+    
+    def __init__(self):
+        self.new_table_s = 'budget'
+        self.orig_table_s_d = {year:'NYSDOB_Enacted_SchoolAid__{0:d}'.format(year-1)
+                               for year in range(2007, 2015)}
+        self.orig_table_s_d[2011] = 'NYSDOB_Enacted_SchoolAid__2011'
+        self.column_s = {year:'{0:d}-{1:02.0f}'.format(year-1, year-2000)
+                         for year in range(2007, 2015)}
+                             
+    def extract(self, year):
+        df = pd.read_excel(os.path.join(config.data_path, 'budgets',
+                                        self.orig_table_s_d[year] + '.xlsx'))
+        filtered_df = df[df['Aid Category'] == 'Sum of Above Aid Categories']
+        trimmed_df = filtered_df.loc[:, ['BEDS Code', self.column_s[year]]]
+        trimmed_df.columns = ['district_{1}'.format(self.new_table_s),
+                              '{1}_{0:d}'.format(year, self.new_table_s)]
+        utilities.write_to_sql_table(trimmed_df, self.new_table_s, 'joined')
+    
+    
 
 class DiscountLunch(object):
     """ Fraction of students receiving reduced or free lunch """
@@ -139,8 +177,7 @@ class DiscountLunch(object):
         command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
-WHERE PER_FREE_LUNCH = 's' OR PER_FREE_LUNCH IS NULL
-OR PER_REDUCED_LUNCH = 's' OR PER_REDUCED_LUNCH IS NULL;"""
+WHERE PER_FREE_LUNCH = 's' OR PER_REDUCED_LUNCH = 's';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
@@ -150,6 +187,42 @@ OR PER_REDUCED_LUNCH = 's' OR PER_REDUCED_LUNCH IS NULL;"""
 SET {1}_{0:d} = (PER_FREE_LUNCH + PER_REDUCED_LUNCH) / 100;"""
         cur.execute(command_s.format(year, self.new_table_s))
             
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+class Dropout(object):
+    """ Fraction of students who dropped out of school """
+    
+    def __init__(self):
+        self.new_table_s = 'dropout'
+        self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education' AND PER_DROPOUT != 's';"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = PER_DROPOUT / 100;"""
+        cur.execute(command_s.format(year, self.new_table_s))
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d}_final
@@ -182,7 +255,7 @@ class EighthELAScore(object):
 WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
-WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+WHERE MEAN_SCORE = 's';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
@@ -222,7 +295,7 @@ class EighthMathScore(object):
 WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
-WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+WHERE MEAN_SCORE = 's';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
@@ -262,13 +335,100 @@ class EighthScienceScore(object):
 WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education';"""
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
-WHERE MEAN_SCORE = 's' OR MEAN_SCORE IS NULL;"""
+WHERE MEAN_SCORE = 's';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
         cur.execute(command_s.format(year, self.new_table_s))
         command_s = """UPDATE temp{0:d} SET {1}_{0:d} = MEAN_SCORE;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
+class PopTwelfth(object):
+    """ Population of 12th grade """
+    
+    def __init__(self):
+        self.new_table_s = 'pop_twelfth'
+        self.orig_table_s_d = {year:'BEDS Day Enrollment' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = `12`;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
+class PostSecondary(object):
+    """ Fraction of students receiving some sort of post-secondary education after high school """
+    
+    def __init__(self):
+        self.new_table_s = 'post_secondary'
+        self.orig_table_s_d = {year:'High School Post-Graduation Plans of Completers' for year in range(2009, 2015)}
+        self.orig_table_s_d[2007] = 'High School Post-Graduation Plans of Graduates'
+        self.orig_table_s_d[2008] = 'High School Post-Graduation Plans of Graduates'
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education'"""
+        if year < 2014:
+            command_s += """ AND PER_4YR_COLLEGE_IN_STATE != 's'
+AND PER_4YR_COLLEGE_OUT_STATE != 's' AND PER_2YR_COLLEGE_IN_STATE != 's'
+AND PER_2YR_COLLEGE_OUT_STATE != 's' AND PER_POST_SECONDARY_IN_STATE != 's'
+AND PER_POST_SECONDARY_OUT_STATE != 's';"""
+        else:
+            command_s += """ AND PER_4YR_COLLEGE != 's'
+AND PER_2YR_COLLEGE != 's' AND PER_POST_SECONDARY != 's';"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        if year < 2014:
+            command_s = """UPDATE temp{0:d} SET {1}_{0:d} = (PER_4YR_COLLEGE_IN_STATE + PER_4YR_COLLEGE_OUT_STATE + PER_2YR_COLLEGE_IN_STATE + PER_2YR_COLLEGE_OUT_STATE + PER_POST_SECONDARY_IN_STATE + PER_POST_SECONDARY_OUT_STATE) / 100;"""
+        else:
+            command_s = """UPDATE temp{0:d} SET {1}_{0:d} = (PER_4YR_COLLEGE + PER_2YR_COLLEGE + PER_POST_SECONDARY) / 100;"""
         cur.execute(command_s.format(year, self.new_table_s))
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
@@ -388,6 +548,80 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         
         
         
+class TeacherNumber(object):
+    """ Number of teachers """
+    
+    def __init__(self):
+        self.new_table_s = 'teacher_number'
+        self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = NUM_TEACH;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
+class TenthClassSize(object):
+    """ Mean class size of 10-grade English, math, science, and social studies """
+    
+    def __init__(self):
+        self.new_table_s = 'tenth_class_size'
+        self.orig_table_s_d = {year:'Average Class Size' for year in range(2007, 2015)}
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = (GRADE_10_ENGLISH + GRADE_10_MATH + GRADE_10_SCI + GRADE_10_SS) / 4;"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
 class TurnoverRate(object):
     """ Turnover rate of all teachers """
     
@@ -407,7 +641,7 @@ class TurnoverRate(object):
         command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
         command_s = """DELETE FROM temp{0:d}
-WHERE PER_TURN_ALL = 's' OR PER_TURN_ALL IS NULL;"""
+WHERE PER_TURN_ALL = 's';"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
@@ -428,9 +662,16 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
         
         
-        
-Database_l = [DiscountLunch, EighthELAScore, EighthMathScore, EighthScienceScore,
-              RegentsPassRate, TurnoverRate]
+
+Database_l = [DiscountLunch,
+              Dropout,
+              PopTwelfth,
+              RegentsPassRate,
+              TeacherNumber,
+              TenthClassSize,
+              TurnoverRate]
+DistrictDatabase_l = [Budget]
+# Features removed: EighthELAScore, EighthMathScore, EighthScienceScore, PostSecondary
         
             
 

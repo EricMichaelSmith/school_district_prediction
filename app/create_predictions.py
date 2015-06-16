@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+from sklearn.preprocessing import Imputer
 import statsmodels.api as sm
 
 import config
@@ -73,47 +74,48 @@ def main():
                                                  diff=True, lag=lag)
 
     # Run control: prediction is same as mean over years in training set
-    model_s = 'mean_over_years_score_control'
+    model_s = 'z_mean_over_years_score_control'
     all_results_d[model_s] = fit_and_predict(data_a, MeanOverYears)
     
     # Run control: prediction is same as previous year's data
-    model_s = 'same_as_last_year_score_control'
+    model_s = 'z_same_as_last_year_score_control'
     all_results_d[model_s] = fit_and_predict(data_a, SameAsLastYear)
     
     # Run control: prediction is same as previous year's data
-    model_s = 'same_change_as_last_year_score_control'
+    model_s = 'z_same_change_as_last_year_score_control'
     all_results_d[model_s] = fit_and_predict(data_a, SameChangeAsLastYear)
 
-    all_train_mses_d = {key: value['last_fitted_year_mse'] for (key, value) in all_results_d.iteritems()}    
-    all_test_mses_d = {key: value['last_data_year_mse'] for (key, value) in all_results_d.iteritems()}
+    chosen_baseline_s = 'z_same_as_last_year_score_control'
+    all_train_mses_d = {key: value['last_fitted_year_rms_error'] for (key, value) in all_results_d.iteritems()}    
+    all_test_mses_d = {key: value['last_data_year_rms_error'] for (key, value) in all_results_d.iteritems()}
     for key, value in all_test_mses_d.iteritems():
-        print('{0}: \n\t{1:1.5g}'.format(key, value))
+        print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
     
     
     ## Plot MSEs of all regression models     
-    model_s_l = ['raw_lag1', 'raw_lag2', 'raw_lag3', 'raw_lag4', 'raw_lag5', 'diff_lag1', 'diff_lag2', 'diff_lag3', 'diff_lag4', 'diff_lag5', 'mean_over_years_score_control', 'same_as_last_year_score_control', 'same_change_as_last_year_score_control']
+    model_s_l = sorted(all_train_mses_d.keys())
     train_mse_l = [all_train_mses_d[key] for key in model_s_l]
     test_mse_l = [all_test_mses_d[key] for key in model_s_l]
     bar_width = 0.35
     train_index_a = np.arange(len(train_mse_l))
     test_index_a = np.arange(bar_width, len(test_mse_l)+bar_width)
-    fig = plt.figure()
-    ax = fig.add_axes([0.1, 0.3, 0.8, 0.6]) 
+    fig = plt.figure(figsize=(1.5*len(model_s_l),12))
+    ax = fig.add_axes([0.10, 0.40, 0.80, 0.50]) 
     ax.bar(train_index_a, train_mse_l, bar_width, color='r', label='Training')
     ax.bar(test_index_a, test_mse_l, bar_width, color='b', label='Test')
-    ax.set_title('Comparison of MSE of autoregression algorithms vs. controls')
+    ax.set_title('Comparison of RMS error of autoregression algorithms vs. controls')
     ax.set_xticks(np.arange(len(test_mse_l))+bar_width)
     ax.set_xticklabels(model_s_l, rotation=90)
-    ax.set_ylabel('Mean squared error')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.12))
-    ax.axhline(y=all_test_mses_d['mean_over_years_score_control'], color='k')
-    ax.set_ylim([0, 1.5*all_test_mses_d['mean_over_years_score_control']])
-    plt.savefig(os.path.join(config.plot_path, 'mse_all_models.png'))
+    ax.set_ylabel('Root mean squared error')
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.50))
+    ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
+    ax.set_ylim([0, 1.5*all_test_mses_d[chosen_baseline_s]])
+    plt.savefig(os.path.join(config.plot_path, 'rms_error_all_models.png'))
                
                
     ## Exploratory plots
     fig = plt.figure()
-    ax = fig.add_subplot(111)                   
+    ax = fig.add_subplot(111)               
     ax.plot(config.year_l, data_a.transpose()*100)
     ax.set_xlabel('Year')
     ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
@@ -187,7 +189,7 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1):
+    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1, positive_control=False):
         """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the fitting, which is ideal for training the algorithm. """
 
         # Apply optional parameters
@@ -204,6 +206,8 @@ class AutoRegression(object):
         for i in range(lag):
             X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
             # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
+        if positive_control:
+            X = np.concatenate((X, array[:, lag:].reshape(-1, 1)), axis=1)                
         if aux_data_a_d:
             for feature_s in aux_data_a_d.iterkeys():
                 if holdout_col > 0:
@@ -217,6 +221,10 @@ class AutoRegression(object):
                 for i in range(lag):
                     X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
         X = sm.add_constant(X)
+        estimatorX = Imputer(axis=0)
+        X = estimatorX.fit_transform(X)
+        estimatorY = Imputer(axis=0)
+        Y = estimatorY.fit_transform(Y.reshape(-1, 1)).reshape(-1)
         
         model = sm.OLS(Y, X)
         results = model.fit()
@@ -226,15 +234,32 @@ class AutoRegression(object):
         return results
         
     def predict(self, raw_array, results, aux_data_a_d=None, diff=False,
-                holdout_col=0, lag=1):
+                holdout_col=0, lag=1, positive_control=False):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
         
+        if positive_control:
+            if holdout_col > 0:
+                if diff:
+                    if holdout_col == 1:
+                        control_array = np.diff(raw_array[:, -2:],
+                                    1, axis=1)
+                    else:
+                        control_array = \
+                            np.diff(raw_array[:, -holdout_col-1:-holdout_col+1],
+                                    1, axis=1)
+                else:
+                    control_array = raw_array[:, -holdout_col]
+            else:
+                control_array = np.random.randn(raw_array.shape[0], 1)
+                
         if holdout_col > 0:
             raw_array = raw_array[:, :-holdout_col]
         prediction_raw_array = raw_array
         if diff:
             array = np.diff(raw_array, 1, axis=1)
             X = array[:, -lag:]
+            if positive_control:
+                X = np.concatenate((X, control_array.reshape(-1, 1)), axis=1)
             if aux_data_a_d:
                 for feature_s in aux_data_a_d.iterkeys():
                     if holdout_col > 0:
@@ -244,11 +269,15 @@ class AutoRegression(object):
                     array = np.diff(raw_array, 1, axis=1)
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
+            estimatorX = Imputer(axis=0)
+            X = estimatorX.fit_transform(X)
             predicted_change_a = results.predict(X)
             prediction_a = prediction_raw_array[:, -1] + predicted_change_a
         else:
             array = raw_array
             X = array[:, -lag:]
+            if positive_control:
+                X = np.concatenate((X, control_array.reshape(-1, 1)), axis=1)
             if aux_data_a_d:
                 for feature_s in aux_data_a_d.iterkeys():
                     if holdout_col > 0:
@@ -258,8 +287,10 @@ class AutoRegression(object):
                     array = raw_array
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             X = sm.add_constant(X)
-            prediction_a = results.predict(X)            
-            
+            estimatorX = Imputer(axis=0)
+            X = estimatorX.fit_transform(X)
+            prediction_a = results.predict(X)   
+                        
         return prediction_a.reshape((-1, 1))
     
     
@@ -272,7 +303,9 @@ class MeanOverYears(object):
     def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, **kwargs):
+    def predict(self, array, results, holdout_col=0, **kwargs):
+        if holdout_col > 0:
+            array = array[:, :-holdout_col]
         mean_over_years_a = np.mean(array, axis=1)
         return mean_over_years_a.reshape((-1, 1))
 
@@ -286,7 +319,9 @@ class SameAsLastYear(object):
     def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, **kwargs):
+    def predict(self, array, results, holdout_col=0, **kwargs):
+        if holdout_col > 0:
+            array = array[:, :-holdout_col]
         last_year_a = array[:, -1]
         return last_year_a.reshape((-1, 1))
         
@@ -300,15 +335,18 @@ class SameChangeAsLastYear(object):
     def fit(self, array, **kwargs):
         return None
         
-    def predict(self, array, results, **kwargs):
+    def predict(self, array, results, holdout_col=0, **kwargs):
+        if holdout_col > 0:
+            array = array[:, :-holdout_col]
         change_over_last_year_a = array[:, -1] - array[:, -2]
         extrapolation_from_last_year_a = array[:, -1] + change_over_last_year_a
         return extrapolation_from_last_year_a.reshape((-1, 1))
         
         
         
-def find_mse(Y, prediction_Y):
-    return np.mean((Y - prediction_Y)**2)
+def find_rms_error(Y, prediction_Y):
+    valid_col_a = ~np.isnan(Y)
+    return np.sqrt(np.mean((Y[valid_col_a] - prediction_Y[valid_col_a])**2))
     
     
     
@@ -321,22 +359,28 @@ def fit_and_predict(array, Class, **kwargs):
     results_d = {}
         
     results_d['result_object'] = instance.fit(array, holdout_col=1,
+                                              positive_control=False,
                                               **kwargs)
     last_fitted_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
-                         holdout_col=2, **kwargs)
-    results_d['last_fitted_year_mse'] = find_mse(array[:, -2],
-                                              last_fitted_year_prediction_a)
+                         holdout_col=2,
+                         positive_control=False,
+                         **kwargs)
+    results_d['last_fitted_year_rms_error'] = find_rms_error(array[:, -2].reshape(-1),
+        last_fitted_year_prediction_a.reshape(-1))
     last_data_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
-                         holdout_col=1, **kwargs)
-    results_d['last_data_year_mse'] = find_mse(array[:, -1],
-                                            last_data_year_prediction_a)    
+                         holdout_col=1,
+                         positive_control=False,
+                         **kwargs)
+    results_d['last_data_year_rms_error'] = find_rms_error(array[:, -1].reshape(-1),
+        last_data_year_prediction_a.reshape(-1))    
     future_prediction_a = np.ndarray((array.shape[0], 0))
     for year in range(num_years_to_predict):
         combined_data_a = np.concatenate((array, future_prediction_a), axis=1)
         new_year_prediction_a = instance.predict(combined_data_a,
                                                  results_d['result_object'],
+                                                 positive_control=False,
                                                  **kwargs)
         future_prediction_a = np.concatenate((future_prediction_a,
                                               new_year_prediction_a), axis=1)
