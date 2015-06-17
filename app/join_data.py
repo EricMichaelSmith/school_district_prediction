@@ -151,7 +151,7 @@ class Budget(object):
     """ Yearly budget """
     
     def __init__(self):
-        self.description = 'Annual budget of school district\n(thousands of dollars)'
+        self.description_s = 'Annual budget of school district\n(thousands of dollars)'
         self.explanatory_name = 'Budget'
         self.multiplier = 0.001
         self.new_table_s = 'budget'
@@ -160,6 +160,7 @@ class Budget(object):
         self.orig_table_s_d[2011] = 'NYSDOB_Enacted_SchoolAid__2011'
         self.column_s = {year:'{0:d}-{1:02.0f}'.format(year-1, year-2000)
                          for year in range(2007, 2015)}
+        self.allow_prediction = True
                              
     def extract(self, year):
 
@@ -181,12 +182,13 @@ class DiscountLunch(object):
     """ Fraction of students receiving reduced or free lunch """
     
     def __init__(self):
-        self.description = 'Students receiving reduced or free lunch (%)'
+        self.description_s = 'Students receiving reduced or free lunch (%)'
         self.explanatory_name = 'Reduced or free lunch'
         self.multiplier = 100
         self.explanatory_name_s = 'Percent of students receiving discounted or free lunch'
         self.new_table_s = 'discount_lunch'
         self.orig_table_s_d = {year:'Demographic Factors' for year in range(2007, 2015)}
+        self.allow_prediction = True
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -225,11 +227,12 @@ class Dropout(object):
     """ Fraction of students who dropped out of school """
     
     def __init__(self):
-        self.description = 'Dropout rate (%)'
+        self.description_s = 'Dropout rate (%)'
         self.explanatory_name = 'Dropout rate'
         self.multiplier = 100
         self.new_table_s = 'dropout'
         self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
+        self.allow_prediction = True
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -385,11 +388,12 @@ class PopTwelfth(object):
     """ Population of 12th grade """
     
     def __init__(self):
-        self.description = '12th grade population'
+        self.description_s = '12th grade population'
         self.explanatory_name = 'Population of 12th grade'
         self.multiplier = 1
         self.new_table_s = 'pop_twelfth'
         self.orig_table_s_d = {year:'BEDS Day Enrollment' for year in range(2007, 2015)}
+        self.allow_prediction = True
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -425,13 +429,14 @@ class PostSecondary(object):
     """ Fraction of students receiving some sort of post-secondary education after high school """
     
     def __init__(self):
-        self.description = 'Percentage of graduates attending college\nor other post-secondary education'
+        self.description_s = 'Percentage of graduates attending college\nor other post-secondary education'
         self.explanatory_name = 'Post-secondary education'
         self.multiplier = 100
         self.new_table_s = 'post_secondary'
         self.orig_table_s_d = {year:'High School Post-Graduation Plans of Completers' for year in range(2009, 2015)}
         self.orig_table_s_d[2007] = 'High School Post-Graduation Plans of Graduates'
         self.orig_table_s_d[2008] = 'High School Post-Graduation Plans of Graduates'
+        self.allow_prediction = True
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -489,7 +494,7 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
 class RegentsPassRate(object):
     
     def __init__(self):
-        self.description = 'Percent passing Regents Exams\n(averaged over subjects)'
+        self.description_s = 'Percent passing Regents Exams\n(averaged over subjects)'
         self.explanatory_name = 'Regents Exams pass rate'
         self.multiplier = 100
         self.new_table_s = 'regents_pass_rate'
@@ -504,6 +509,7 @@ class RegentsPassRate(object):
                           2012: 'Regents Examination Annual Results',
                           2013: 'Regents Examination Annual Results',
                           2014: 'Regents Examination Annual Results'}
+        self.allow_prediction = True
 
     def extract(self, cur, year):
         """ Returns an N-by-3 of the ENTITY_CD, SUBJECT, and pass rate """
@@ -599,11 +605,12 @@ class TeacherNumber(object):
     """ Number of teachers """
     
     def __init__(self):
-        self.description = 'Number of teachers'
+        self.description_s = 'Number of teachers'
         self.explanatory_name = 'Number of teachers'
         self.multiplier = 1
         self.new_table_s = 'teacher_number'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
+        self.allow_prediction = True
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -639,11 +646,12 @@ class TenthClassSize(object):
     """ Mean class size of 10-grade English, math, science, and social studies """
     
     def __init__(self):
-        self.description = 'Size of 10th grade classes\n(averaged over English, math, science, and social studies)'
+        self.description_s = 'Size of 10th grade classes\n(averaged over English, math, science, and social studies)'
         self.explanatory_name = 'Average classroom size'
         self.multiplier = 1
         self.new_table_s = 'tenth_class_size'
         self.orig_table_s_d = {year:'Average Class Size' for year in range(2007, 2015)}
+        self.allow_prediction = False
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -679,11 +687,13 @@ class TurnoverRate(object):
     """ Turnover rate of all teachers """
     
     def __init__(self):
-        self.description = 'Percentage of teacher turnover in a given year'
+        self.description_s = 'Percentage of teacher turnover in a given year'
         self.explanatory_name = 'Turnover rate'
         self.multiplier = 100
         self.new_table_s = 'turnover_rate'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
+        self.allow_prediction = True
+
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """

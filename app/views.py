@@ -7,11 +7,11 @@ import pymysql as mdb
 import StringIO
 
 import config
+import join_data
 
 db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
 
-primary_feature_s = 'regents_pass_rate'
-plot_label_s = 'Percent passing Regents Exams\n(averaged over subjects)'
+plot_instance = join_data.RegentsPassRate()
 
 
 
@@ -87,7 +87,7 @@ def plot():
               np.array(schools2_extrapolation_l)*100, 'b--')
     axis.set_xlabel('Year')
     axis.set_xlim([config.year_l[0], config.prediction_year_l[-1]])
-    axis.set_title(plot_label_s)
+    axis.set_title(plot_instance.description_s)
     axis.ticklabel_format(useOffset=False)
     axis.legend([curve1, curve2], [schools1_past[0]['name'], schools2_past[0]['name']],
                 loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
@@ -106,7 +106,7 @@ def query_past_scores(ID=None, name=None):
         #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
         for year in config.year_l:
-            command_s += '{0}_{1:d}, '.format(primary_feature_s, year)
+            command_s += '{0}_{1:d}, '.format(plot_instance.new_table_s, year)
         command_s = command_s[:-2]
         if ID:
             command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)            
@@ -131,11 +131,11 @@ def query_prediction_scores(ID):
         #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, '
         for year in config.prediction_year_l:
-            command_s += '{0}_prediction_{1:d}, '.format(primary_feature_s,
+            command_s += '{0}_prediction_{1:d}, '.format(plot_instance.new_table_s,
                                                            year)
         command_s = command_s[:-2]
         command_s += " FROM {0}_prediction WHERE ENTITY_CD='{1}';"\
-            .format(primary_feature_s, ID)
+            .format(plot_instance.new_table_s, ID)
         cur.execute(command_s.format(ID))
         query_results = cur.fetchall()
 
