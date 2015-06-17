@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import Imputer
 
@@ -226,6 +227,7 @@ class AutoRegression(object):
         Y = estimatorY.fit_transform(Y.reshape(-1, 1)).reshape(-1)
         
         model = LinearRegression(fit_intercept=True, normalize=True)
+#        model = RandomForestRegressor(max_features='auto')
         model.fit(X, Y)
         print('Lag of {0:d}:'.format(lag))
         print(model.coef_)
