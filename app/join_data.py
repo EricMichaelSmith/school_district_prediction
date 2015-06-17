@@ -151,6 +151,9 @@ class Budget(object):
     """ Yearly budget """
     
     def __init__(self):
+        self.description = 'Annual budget of school district\n(thousands of dollars)'
+        self.explanatory_name = 'Budget'
+        self.multiplier = 0.001
         self.new_table_s = 'budget'
         self.orig_table_s_d = {year:'NYSDOB_Enacted_SchoolAid__{0:d}'.format(year-1)
                                for year in range(2007, 2015)}
@@ -178,6 +181,10 @@ class DiscountLunch(object):
     """ Fraction of students receiving reduced or free lunch """
     
     def __init__(self):
+        self.description = 'Students receiving reduced or free lunch (%)'
+        self.explanatory_name = 'Reduced or free lunch'
+        self.multiplier = 100
+        self.explanatory_name_s = 'Percent of students receiving discounted or free lunch'
         self.new_table_s = 'discount_lunch'
         self.orig_table_s_d = {year:'Demographic Factors' for year in range(2007, 2015)}
         
@@ -218,6 +225,9 @@ class Dropout(object):
     """ Fraction of students who dropped out of school """
     
     def __init__(self):
+        self.description = 'Dropout rate (%)'
+        self.explanatory_name = 'Dropout rate'
+        self.multiplier = 100
         self.new_table_s = 'dropout'
         self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
         
@@ -375,6 +385,9 @@ class PopTwelfth(object):
     """ Population of 12th grade """
     
     def __init__(self):
+        self.description = '12th grade population'
+        self.explanatory_name = 'Population of 12th grade'
+        self.multiplier = 1
         self.new_table_s = 'pop_twelfth'
         self.orig_table_s_d = {year:'BEDS Day Enrollment' for year in range(2007, 2015)}
         
@@ -412,6 +425,9 @@ class PostSecondary(object):
     """ Fraction of students receiving some sort of post-secondary education after high school """
     
     def __init__(self):
+        self.description = 'Percentage of graduates attending college\nor other post-secondary education'
+        self.explanatory_name = 'Post-secondary education'
+        self.multiplier = 100
         self.new_table_s = 'post_secondary'
         self.orig_table_s_d = {year:'High School Post-Graduation Plans of Completers' for year in range(2009, 2015)}
         self.orig_table_s_d[2007] = 'High School Post-Graduation Plans of Graduates'
@@ -429,14 +445,26 @@ class PostSecondary(object):
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
 WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education'"""
         if year < 2014:
-            command_s += """ AND PER_4YR_COLLEGE_IN_STATE != 's'
-AND PER_4YR_COLLEGE_OUT_STATE != 's' AND PER_2YR_COLLEGE_IN_STATE != 's'
-AND PER_2YR_COLLEGE_OUT_STATE != 's' AND PER_POST_SECONDARY_IN_STATE != 's'
-AND PER_POST_SECONDARY_OUT_STATE != 's';"""
+            command_s += """ AND PER_4YR_COLLEGE_IN_STATE NOT LIKE '%s%'
+AND PER_4YR_COLLEGE_OUT_STATE NOT LIKE '%s%'
+AND PER_2YR_COLLEGE_IN_STATE NOT LIKE '%s%'
+AND PER_2YR_COLLEGE_OUT_STATE NOT LIKE '%s%'
+AND PER_POST_SECONDARY_IN_STATE NOT LIKE '%s%'
+AND PER_POST_SECONDARY_OUT_STATE NOT LIKE '%s%';"""
         else:
             command_s += """ AND PER_4YR_COLLEGE != 's'
 AND PER_2YR_COLLEGE != 's' AND PER_POST_SECONDARY != 's';"""
         cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        if year < 2014:
+            command_s = """DELETE FROM temp{0:d} WHERE PER_4YR_COLLEGE_IN_STATE LIKE '%s%'
+OR PER_4YR_COLLEGE_OUT_STATE LIKE '%s%' OR PER_2YR_COLLEGE_IN_STATE LIKE '%s%'
+OR PER_2YR_COLLEGE_OUT_STATE LIKE '%s%' OR PER_POST_SECONDARY_IN_STATE LIKE '%s%'
+OR PER_POST_SECONDARY_OUT_STATE LIKE '%s%';"""
+            cur.execute(command_s.format(year))
+        else:
+            command_s = """DELETE FROM temp{0:d} WHERE PER_4YR_COLLEGE LIKE '%s%'
+OR PER_2YR_COLLEGE LIKE '%s%' OR PER_POST_SECONDARY LIKE '%s%';"""
+            cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
         cur.execute(command_s.format(year))
         command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
@@ -461,6 +489,9 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
 class RegentsPassRate(object):
     
     def __init__(self):
+        self.description = 'Percent passing Regents Exams\n(averaged over subjects)'
+        self.explanatory_name = 'Regents Exams pass rate'
+        self.multiplier = 100
         self.new_table_s = 'regents_pass_rate'
         self.orig_table_s_d = {2004: 'Regents',
                           2005: 'Regents',
@@ -568,6 +599,9 @@ class TeacherNumber(object):
     """ Number of teachers """
     
     def __init__(self):
+        self.description = 'Number of teachers'
+        self.explanatory_name = 'Number of teachers'
+        self.multiplier = 1
         self.new_table_s = 'teacher_number'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
         
@@ -605,6 +639,9 @@ class TenthClassSize(object):
     """ Mean class size of 10-grade English, math, science, and social studies """
     
     def __init__(self):
+        self.description = 'Size of 10th grade classes\n(averaged over English, math, science, and social studies)'
+        self.explanatory_name = 'Average classroom size'
+        self.multiplier = 1
         self.new_table_s = 'tenth_class_size'
         self.orig_table_s_d = {year:'Average Class Size' for year in range(2007, 2015)}
         
@@ -642,6 +679,9 @@ class TurnoverRate(object):
     """ Turnover rate of all teachers """
     
     def __init__(self):
+        self.description = 'Percentage of teacher turnover in a given year'
+        self.explanatory_name = 'Turnover rate'
+        self.multiplier = 100
         self.new_table_s = 'turnover_rate'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
         
@@ -682,12 +722,13 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
 Database_l = [DiscountLunch,
               Dropout,
               PopTwelfth,
+              PostSecondary,
               RegentsPassRate,
               TeacherNumber,
               TenthClassSize,
               TurnoverRate]
 DistrictDatabase_l = [Budget]
-# Features removed: EighthELAScore, EighthMathScore, EighthScienceScore, PostSecondary
+# Features removed: EighthELAScore, EighthMathScore, EighthScienceScore
         
             
 

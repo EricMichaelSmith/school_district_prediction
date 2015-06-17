@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.gaussian_process import GaussianProcess
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import Imputer
 
@@ -32,134 +33,22 @@ def main():
     con = utilities.connect_to_sql('joined')
     with con:
         cur = con.cursor() 
-        field_s_l = ['ENTITY_CD'] + \
-            ['{0}_{1:d}'.format(primary_feature_s, year) for year in config.year_l]
-        raw_data_a = utilities.select_data(con, cur, field_s_l, 'master',
-                                  output_type='np_array')
-        aux_data_a_d = {}
-        aux_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
-        for Database in aux_Database_l:
+        data_a_d = {}
+        all_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
+        for Database in all_Database_l:
             Instance = Database()
             feature_s = Instance.new_table_s
-            if feature_s != primary_feature_s:
-                field_s_l = ['ENTITY_CD'] + \
-                    ['{0}_{1:d}'.format(feature_s, year) for year in config.year_l]
-                aux_data_a_d[feature_s] = utilities.select_data(con, cur, field_s_l,
-                                                                'master',
-                                                                output_type='np_array')
-
+            field_s_l = ['ENTITY_CD'] + \
+                ['{0}_{1:d}'.format(feature_s, year) for year in config.year_l]
+            data_a_d[feature_s] = utilities.select_data(con, cur, field_s_l,
+                                                        'master',
+                                                        output_type='np_array')
+                                                        
+    ## Run prediction over all features
+    for feature_s in data_a_d.iterkeys():
+        predict_a_feature(data_a_d, feature_s)   
+        
     
-    ## Format data
-    data_a = raw_data_a[:, 1:]
-    # Drop the ENTITY_CD column
-    for feature_s in aux_data_a_d.iterkeys():
-        aux_data_a_d[feature_s] = aux_data_a_d[feature_s][:, 1:]
-    
-    
-    ## Run regression models, validate and predict future scores, and run controls    
-    all_results_d = {}
-    lag_l = range(1, 6)
-    
-    # Run autoregression with different lags on raw test scores
-    for lag in lag_l:
-        model_s = 'raw_lag{:d}'.format(lag)
-        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
-                                                 aux_data_a_d=aux_data_a_d,
-                                                 diff=False, lag=lag)
-    
-    # Run autogression with different lags on diff of test scores w.r.t. year
-    for lag in lag_l:
-        model_s = 'diff_lag{:d}'.format(lag)
-        all_results_d[model_s] = fit_and_predict(data_a, AutoRegression,
-                                                 aux_data_a_d=aux_data_a_d,
-                                                 diff=True, lag=lag)
-
-    # Run control: prediction is same as mean over years in training set
-    model_s = 'z_mean_over_years_score_control'
-    all_results_d[model_s] = fit_and_predict(data_a, MeanOverYears)
-    
-    # Run control: prediction is same as previous year's data
-    model_s = 'z_same_as_last_year_score_control'
-    all_results_d[model_s] = fit_and_predict(data_a, SameAsLastYear)
-    
-    # Run control: prediction is same as previous year's data
-    model_s = 'z_same_change_as_last_year_score_control'
-    all_results_d[model_s] = fit_and_predict(data_a, SameChangeAsLastYear)
-
-    chosen_baseline_s = 'z_same_as_last_year_score_control'
-    all_train_mses_d = {key: value['last_fitted_year_rms_error'] for (key, value) in all_results_d.iteritems()}    
-    all_test_mses_d = {key: value['last_data_year_rms_error'] for (key, value) in all_results_d.iteritems()}
-    for key, value in all_test_mses_d.iteritems():
-        print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
-    
-    
-    ## Plot MSEs of all regression models     
-    model_s_l = sorted(all_train_mses_d.keys())
-    train_mse_l = [all_train_mses_d[key] for key in model_s_l]
-    test_mse_l = [all_test_mses_d[key] for key in model_s_l]
-    bar_width = 0.35
-    train_index_a = np.arange(len(train_mse_l))
-    test_index_a = np.arange(bar_width, len(test_mse_l)+bar_width)
-    fig = plt.figure(figsize=(1.5*len(model_s_l),12))
-    ax = fig.add_axes([0.10, 0.40, 0.80, 0.50]) 
-    ax.bar(train_index_a, train_mse_l, bar_width, color='r', label='Training')
-    ax.bar(test_index_a, test_mse_l, bar_width, color='b', label='Test')
-    ax.set_title('Comparison of RMS error of autoregression algorithms vs. controls')
-    ax.set_xticks(np.arange(len(test_mse_l))+bar_width)
-    ax.set_xticklabels(model_s_l, rotation=90)
-    ax.set_ylabel('Root mean squared error')
-    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.50))
-    ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
-    ax.set_ylim([0, 1.5*all_test_mses_d[chosen_baseline_s]])
-    plt.savefig(os.path.join(config.plot_path, 'rms_error_all_models.png'))
-               
-               
-#    ## Exploratory plots
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111)               
-#    ax.plot(config.year_l, data_a.transpose()*100)
-#    ax.set_xlabel('Year')
-#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-#    ax.set_ylim([0, 100])
-#    ax.ticklabel_format(useOffset=False)
-#    plt.savefig(os.path.join(config.plot_path, 'all_schools.png'))
-#    
-#    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 0.2)
-#    to_plot_a = data_a[significant_rising_la, :].transpose()
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111)
-#    ax.plot(config.year_l, to_plot_a*100)
-#    ax.set_xlabel('Year')
-#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-#    ax.set_ylim([0, 100])
-#    ax.ticklabel_format(useOffset=False)
-#    plt.savefig(os.path.join(config.plot_path, 'significant_rising.png'))
-#    
-#    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -0.2)
-#    to_plot_a = data_a[significant_falling_la, :].transpose()
-#    fig = plt.figure()
-#    ax = fig.add_subplot(111)
-#    ax.plot(config.year_l, to_plot_a*100)
-#    ax.set_xlabel('Year')
-#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-#    ax.set_ylim([0, 100])
-#    ax.ticklabel_format(useOffset=False)
-#    plt.savefig(os.path.join(config.plot_path, 'significant_falling.png'))
-    
-    
-    ## Save data to the SQL database
-    model_to_save_s = 'raw_lag1'
-    new_column_s_l = ['ENTITY_CD'] + \
-        ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
-         for year in config.prediction_year_l]
-    prediction_a = np.concatenate((raw_data_a[:, 0].reshape(-1, 1),
-                                   all_results_d[model_to_save_s]['prediction_a']),
-                                  axis=1)
-    prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
-    utilities.write_to_sql_table(prediction_df,
-                                 '{0}_prediction'.format(primary_feature_s), 'joined')    
-
-
 
 # Let's think about applying statsmodels' ARIMA model later: I'm thinking that the way to do this is to bring in all data except for one high school's time series data using the "exog" keyword, but I don't think that's truly cross-sectional: "exog" seems to be more useful for predicting future test pass rates from past past rates and funding level, for example, not from past pass rates of the school in question and all other schools. And Des seems to be right that vector ARIMA isn't the way to go here, because it seems like each sample in the cross-section still gets its own fitted variables, right?
 #class ARIMA(object):
@@ -181,9 +70,9 @@ def main():
 #    def predict(self, raw_array, results, order_t=(0,0,0))
 #        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
 #
-#        # {{{}}}        
-        
-    
+#        # {{{}}}
+
+
 
 class AutoRegression(object):
 
@@ -228,6 +117,7 @@ class AutoRegression(object):
         
         model = LinearRegression(fit_intercept=True, normalize=True)
 #        model = RandomForestRegressor(max_features='auto')
+#        model = GradientBoostingRegressor(max_features='sqrt')
         model.fit(X, Y)
         print('Lag of {0:d}:'.format(lag))
         print(model.coef_)
@@ -388,11 +278,96 @@ def fit_and_predict(array, Class, **kwargs):
     return results_d
     
     
+
+def predict_a_feature(input_data_a_d, primary_feature_s):
     
-PrimaryFeature = join_data.RegentsPassRate()
-primary_feature_s = PrimaryFeature.new_table_s
+    print('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
+    
+    data_a_d = input_data_a_d.copy()
+    index_a = data_a_d[primary_feature_s][:, 0]
+        
+    
+    ## Drop the ENTITY_CD column
+    for feature_s in data_a_d.iterkeys():
+        data_a_d[feature_s] = data_a_d[feature_s][:, 1:]
+        
+        
+    ## Split data
+    main_data_a = data_a_d[primary_feature_s]
+    data_a_d.pop(primary_feature_s)
     
     
+    ## Run regression models, validate and predict future scores, and run controls    
+    all_results_d = {}
+    lag_l = range(1, 6)
+    
+    # Run autoregression with different lags on raw test scores
+    for lag in lag_l:
+        model_s = 'raw_lag{:d}'.format(lag)
+        all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
+                                                 aux_data_a_d=data_a_d,
+                                                 diff=False, lag=lag)
+    
+    # Run autogression with different lags on diff of test scores w.r.t. year
+    for lag in lag_l:
+        model_s = 'diff_lag{:d}'.format(lag)
+        all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
+                                                 aux_data_a_d=data_a_d,
+                                                 diff=True, lag=lag)
+
+    # Run control: prediction is same as mean over years in training set
+    model_s = 'z_mean_over_years_score_control'
+    all_results_d[model_s] = fit_and_predict(main_data_a, MeanOverYears)
+    
+    # Run control: prediction is same as previous year's data
+    model_s = 'z_same_as_last_year_score_control'
+    all_results_d[model_s] = fit_and_predict(main_data_a, SameAsLastYear)
+    
+    # Run control: prediction is same as previous year's data
+    model_s = 'z_same_change_as_last_year_score_control'
+    all_results_d[model_s] = fit_and_predict(main_data_a, SameChangeAsLastYear)
+
+    chosen_baseline_s = 'z_mean_over_years_score_control'
+    all_train_mses_d = {key: value['last_fitted_year_rms_error'] for (key, value) in all_results_d.iteritems()}    
+    all_test_mses_d = {key: value['last_data_year_rms_error'] for (key, value) in all_results_d.iteritems()}
+    for key, value in all_test_mses_d.iteritems():
+        print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
+    
+    
+    ## Plot MSEs of all regression models     
+    model_s_l = sorted(all_train_mses_d.keys())
+    train_mse_l = [all_train_mses_d[key] for key in model_s_l]
+    test_mse_l = [all_test_mses_d[key] for key in model_s_l]
+    bar_width = 0.35
+    train_index_a = np.arange(len(train_mse_l))
+    test_index_a = np.arange(bar_width, len(test_mse_l)+bar_width)
+    fig = plt.figure(figsize=(1.5*len(model_s_l),12))
+    ax = fig.add_axes([0.10, 0.40, 0.80, 0.50]) 
+    ax.bar(train_index_a, train_mse_l, bar_width, color='r', label='Training')
+    ax.bar(test_index_a, test_mse_l, bar_width, color='b', label='Test')
+    ax.set_title('Comparison of RMS error of autoregression algorithms vs. controls')
+    ax.set_xticks(np.arange(len(test_mse_l))+bar_width)
+    ax.set_xticklabels(model_s_l, rotation=90)
+    ax.set_ylabel('Root mean squared error')
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.50))
+    ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
+    ax.set_ylim([0, 1.5*all_test_mses_d[chosen_baseline_s]])
+    plt.savefig(os.path.join(config.plot_path, 'create_predictions', 'rms_error_all_models__{0}.png'.format(primary_feature_s)))
+    
+    
+    ## Save data to the SQL database
+    model_to_save_s = 'raw_lag1'
+    new_column_s_l = ['ENTITY_CD'] + \
+        ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
+         for year in config.prediction_year_l]
+    prediction_a = np.concatenate((index_a.reshape(-1, 1),
+                                   all_results_d[model_to_save_s]['prediction_a']),
+                                  axis=1)
+    prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
+    utilities.write_to_sql_table(prediction_df,
+                                 '{0}_prediction'.format(primary_feature_s), 'joined')    
+    
+
     
 if __name__ == '__main__':
     main()
