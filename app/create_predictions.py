@@ -327,11 +327,13 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
     model_s = 'z_same_change_as_last_year_score_control'
     all_results_d[model_s] = fit_and_predict(main_data_a, SameChangeAsLastYear)
 
-    chosen_baseline_s = 'z_mean_over_years_score_control'
+    chosen_baseline_s_l = ['z_mean_over_years_score_control',               
+                           'z_same_as_last_year_score_control']
     all_train_mses_d = {key: value['last_fitted_year_rms_error'] for (key, value) in all_results_d.iteritems()}    
     all_test_mses_d = {key: value['last_data_year_rms_error'] for (key, value) in all_results_d.iteritems()}
     for key, value in all_test_mses_d.iteritems():
-        print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
+        for chosen_baseline_s in chosen_baseline_s_l:
+            print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
     
     
     ## Plot MSEs of all regression models     
@@ -350,8 +352,9 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
     ax.set_xticklabels(model_s_l, rotation=90)
     ax.set_ylabel('Root mean squared error')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.50))
-    ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
-    ax.set_ylim([0, 1.5*all_test_mses_d[chosen_baseline_s]])
+    for chosen_baseline_s in chosen_baseline_s_l:
+        ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
+    ax.set_ylim([0, 1.5*all_test_mses_d['z_mean_over_years_score_control']])
     plt.savefig(os.path.join(config.plot_path, 'create_predictions', 'rms_error_all_models__{0}.png'.format(primary_feature_s)))
     
     
