@@ -72,6 +72,7 @@ def plot():
     schools2_prediction = query_prediction_scores(ID=ID2)        
 
     fig = plt.Figure()
+    fig.patch.set_facecolor('white')
     axis = fig.add_axes([0.1, 0.23, 0.8, 0.67])
  
     curve1, = axis.plot(config.year_l, np.array(schools1_past[0]['score_l'])*100, 'r')
@@ -85,10 +86,11 @@ def plot():
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
               np.array(schools2_extrapolation_l)*100, 'b--')
     axis.set_xlabel('Year')
+    axis.set_xlim([config.year_l[0], config.prediction_year_l[-1]])
     axis.set_title(plot_label_s)
     axis.ticklabel_format(useOffset=False)
     axis.legend([curve1, curve2], [schools1_past[0]['name'], schools2_past[0]['name']],
-                loc='upper center', bbox_to_anchor=(0.5, -0.12))
+                loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
     canvas = FigureCanvas(fig)
     output = StringIO.StringIO()
     canvas.print_png(output)

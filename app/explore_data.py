@@ -112,9 +112,10 @@ if not os.path.isdir(save_path):
     os.mkdir(save_path)
 
 database_s_l = []
-for Database in join_data.Database_l:
+for Database in join_data.Database_l + join_data.DistrictDatabase_l:
     Instance = Database()
     database_s_l.append(Instance.new_table_s)
+    
     
 data_a_d = {}
 con = utilities.connect_to_sql('joined')

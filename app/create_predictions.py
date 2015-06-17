@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import Imputer
-import statsmodels.api as sm
 
 import config
 reload(config)
@@ -36,7 +36,7 @@ def main():
         raw_data_a = utilities.select_data(con, cur, field_s_l, 'master',
                                   output_type='np_array')
         aux_data_a_d = {}
-        aux_Database_l = join_data.Database_l
+        aux_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
         for Database in aux_Database_l:
             Instance = Database()
             feature_s = Instance.new_table_s
@@ -113,37 +113,37 @@ def main():
     plt.savefig(os.path.join(config.plot_path, 'rms_error_all_models.png'))
                
                
-    ## Exploratory plots
-    fig = plt.figure()
-    ax = fig.add_subplot(111)               
-    ax.plot(config.year_l, data_a.transpose()*100)
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-    ax.set_ylim([0, 100])
-    ax.ticklabel_format(useOffset=False)
-    plt.savefig(os.path.join(config.plot_path, 'all_schools.png'))
-    
-    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 0.2)
-    to_plot_a = data_a[significant_rising_la, :].transpose()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(config.year_l, to_plot_a*100)
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-    ax.set_ylim([0, 100])
-    ax.ticklabel_format(useOffset=False)
-    plt.savefig(os.path.join(config.plot_path, 'significant_rising.png'))
-    
-    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -0.2)
-    to_plot_a = data_a[significant_falling_la, :].transpose()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(config.year_l, to_plot_a*100)
-    ax.set_xlabel('Year')
-    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
-    ax.set_ylim([0, 100])
-    ax.ticklabel_format(useOffset=False)
-    plt.savefig(os.path.join(config.plot_path, 'significant_falling.png'))
+#    ## Exploratory plots
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111)               
+#    ax.plot(config.year_l, data_a.transpose()*100)
+#    ax.set_xlabel('Year')
+#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
+#    ax.set_ylim([0, 100])
+#    ax.ticklabel_format(useOffset=False)
+#    plt.savefig(os.path.join(config.plot_path, 'all_schools.png'))
+#    
+#    significant_rising_la = (data_a[:, -1] - data_a[:, 0] > 0.2)
+#    to_plot_a = data_a[significant_rising_la, :].transpose()
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111)
+#    ax.plot(config.year_l, to_plot_a*100)
+#    ax.set_xlabel('Year')
+#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
+#    ax.set_ylim([0, 100])
+#    ax.ticklabel_format(useOffset=False)
+#    plt.savefig(os.path.join(config.plot_path, 'significant_rising.png'))
+#    
+#    significant_falling_la = (data_a[:, -1] - data_a[:, 0] < -0.2)
+#    to_plot_a = data_a[significant_falling_la, :].transpose()
+#    fig = plt.figure()
+#    ax = fig.add_subplot(111)
+#    ax.plot(config.year_l, to_plot_a*100)
+#    ax.set_xlabel('Year')
+#    ax.set_ylabel('Percent passing Regents exam\n(averaged over subjects)')
+#    ax.set_ylim([0, 100])
+#    ax.ticklabel_format(useOffset=False)
+#    plt.savefig(os.path.join(config.plot_path, 'significant_falling.png'))
     
     
     ## Save data to the SQL database
@@ -220,18 +220,17 @@ class AutoRegression(object):
                     array = raw_array
                 for i in range(lag):
                     X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
-        X = sm.add_constant(X)
         estimatorX = Imputer(axis=0)
         X = estimatorX.fit_transform(X)
         estimatorY = Imputer(axis=0)
         Y = estimatorY.fit_transform(Y.reshape(-1, 1)).reshape(-1)
         
-        model = sm.OLS(Y, X)
-        results = model.fit()
+        model = LinearRegression(fit_intercept=True, normalize=True)
+        model.fit(X, Y)
         print('Lag of {0:d}:'.format(lag))
-        print(results.params)
+        print(model.coef_)
         
-        return results
+        return model
         
     def predict(self, raw_array, results, aux_data_a_d=None, diff=False,
                 holdout_col=0, lag=1, positive_control=False):
@@ -268,7 +267,6 @@ class AutoRegression(object):
                         raw_array = aux_data_a_d[feature_s]
                     array = np.diff(raw_array, 1, axis=1)
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
-            X = sm.add_constant(X)
             estimatorX = Imputer(axis=0)
             X = estimatorX.fit_transform(X)
             predicted_change_a = results.predict(X)
@@ -286,7 +284,6 @@ class AutoRegression(object):
                         raw_array = aux_data_a_d[feature_s]
                     array = raw_array
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
-            X = sm.add_constant(X)
             estimatorX = Imputer(axis=0)
             X = estimatorX.fit_transform(X)
             prediction_a = results.predict(X)   

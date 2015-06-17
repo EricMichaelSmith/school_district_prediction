@@ -8,7 +8,7 @@
     <meta name="author" content="">
     <link rel="icon" href="../../favicon.ico">
 
-    <title>Starter Template for Bootstrap</title>
+    <title>Schoolstradamus: Forecasting a school's future test scores</title>
 
     <!-- Bootstrap core CSS -->
     <link href="../static/css/bootstrap.min.css" rel="stylesheet">
@@ -41,11 +41,10 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="#">Project name</a>
+          <a class="navbar-brand" href="#">Schoolstradamus</a>
         </div>
         <div class="collapse navbar-collapse">
           <ul class="nav navbar-nav">
-            <li class="active"><a href="#">Home</a></li>
             <li><a href="#about">About</a></li>
             <li><a href="#contact">Contact</a></li>
           </ul>
@@ -58,19 +57,20 @@
   <div class="container">
 
     <div class="starter-template">
-        <h2>Schoolstradamus (a.k.a. "I Can't Think of a Good Title Right Now")</h2>
-        <p>This program will compare the test scores of two school districts, not only over the past few years, but also extrapolated into the future. Eventually the user will be able to search for names of school districts, but for now he/she must search by ID number only:</p>
+        <h2><center>Schoolstradamus</center></h2>
+      <h3><center>Forecasting a school's future test scores</center></h3>
+        <p>Enter two high schools in the State of New York, and this website will predict the percentage of students from each school that will pass the Regents Exams a few years from now.</p>
     </div>
 
     <div class = "container">
 
       <form action="/output" method="GET">
         <div class="form-group">
-          <label for="Name1"><font color="red">School Name 1</font> (just use 'Downsville [120301040001]' for now):</label>
-          <input type="text" id="Name1" name='Name1' placeholder="e.g. Downsville Central School">
+          <label for="Name1"><font color="red">School Name 1:</font></label>
+          <input type="text" id="Name1" name='Name1' placeholder=" e.g. Downsville Central School" style="width:320px">
           <br>
-          <label for="Name2"><font color="blue">School Name 2</font> (just use 'Canajoharie [270301040002]' for now):</label>
-          <input type="text" id="Name2" name='Name2' placeholder="e.g. Canajoharie Senior High School">
+          <label for="Name2"><font color="blue">School Name 2:</font></label>
+          <input type="text" id="Name2" name='Name2' placeholder=" e.g. Canajoharie Senior High School" style="width:320px">
         </div>
         <div>
           <button type="submit" class="btn btn-default btn-lg">Make prediction</button>

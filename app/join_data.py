@@ -16,33 +16,33 @@ reload(utilities)
 
 def main():
     
-#    find_school_key()    
-#    
-#    for Database in Database_l:
-#        instance = Database()
-#        con = utilities.connect_to_sql('temp')    
-#        with con:
-#            cur = con.cursor()
-#            for year in config.year_l:
-#                instance.extract(cur, year)
-#        con = utilities.connect_to_sql('joined')
-#        with con:
-#            cur = con.cursor()
-#            join_years(cur, instance.new_table_s)
+    find_school_key()    
+    
+    for Database in Database_l:
+        instance = Database()
+        con = utilities.connect_to_sql('temp')    
+        with con:
+            cur = con.cursor()
+            for year in config.year_l:
+                instance.extract(cur, year)
+        con = utilities.connect_to_sql('joined')
+        with con:
+            cur = con.cursor()
+            join_years(cur, instance.new_table_s, 'ENTITY_CD')
             
     for Database in DistrictDatabase_l:
         instance = Database()
         for year in config.year_l:
             instance.extract(year)
         con = utilities.connect_to_sql('joined')
-#        with con:
-#            cur = con.cursor()
-#            join_district_years(cur, instance.new_table_s)
-#            
-#    con = utilities.connect_to_sql('joined')
-#    with con:
-#        cur = con.cursor()
-#        join_databases(cur, Database_l)
+        with con:
+            cur = con.cursor()
+            join_years(cur, instance.new_table_s, 'district')
+            
+    con = utilities.connect_to_sql('joined')
+    with con:
+        cur = con.cursor()
+        join_databases(cur, Database_l, DistrictDatabase_l)
 
 
 
@@ -85,11 +85,12 @@ ADD INDEX ENTITY_CD (ENTITY_CD)"""
         
         
 
-def join_databases(cur, Database_l):
+def join_databases(cur, Database_l, DistrictDatabase_l):
     """ Join all databases """
     
     master_database_s = 'master'
     individual_database_s_l = [extract_table_name(Database) for Database in Database_l]
+    individual_district_database_s_l = [extract_table_name(Database) for Database in DistrictDatabase_l]
     
     print('Starting join_databases')
     
@@ -106,6 +107,16 @@ LEFT JOIN (SELECT ENTITY_CD_{0}, """.format(individual_database_s)
 ON school_key.ENTITY_CD = {0}.ENTITY_CD_{0}"""
         this_table_command_s = this_table_command_s.format(individual_database_s)
         command_s += this_table_command_s
+    for individual_database_s in individual_district_database_s_l:
+        this_table_command_s = """
+LEFT JOIN (SELECT district_{0}, """.format(individual_database_s)
+        for year in config.year_l:
+            this_table_command_s += '{0}_{1:d}, '.format(individual_database_s, year)
+        this_table_command_s = this_table_command_s[:-2]
+        this_table_command_s += """ FROM {0}) AS {0}
+ON school_key.district = {0}.district_{0}"""
+        this_table_command_s = this_table_command_s.format(individual_database_s)
+        command_s += this_table_command_s
     command_s += ';'
     cur.execute(command_s)
     
@@ -113,7 +124,7 @@ ON school_key.ENTITY_CD = {0}.ENTITY_CD_{0}"""
         
         
         
-def join_years(cur, new_table_s):
+def join_years(cur, new_table_s, join_s):
     """ Join separate years of a database that was just extracted into the temp database """
     
     print('Starting join_years for {0}'.format(new_table_s))
@@ -124,13 +135,13 @@ SELECT * FROM school_key""".format(new_table_s)
     for year in config.year_l:
         this_table_command_s = """
 INNER JOIN temp.temp{0:d}_final
-ON school_key.ENTITY_CD = temp.temp{0:d}_final.ENTITY_CD_{0:d}"""
-        this_table_command_s = this_table_command_s.format(year)
+ON school_key.{1} = temp.temp{0:d}_final.{1}_{0:d}"""
+        this_table_command_s = this_table_command_s.format(year, join_s)
         command_s += this_table_command_s
     command_s += ';'
     cur.execute(command_s)
-    command_s = """ALTER TABLE {0} CHANGE ENTITY_CD ENTITY_CD_{0} CHAR(12);"""
-    cur.execute(command_s.format(new_table_s))
+    command_s = """ALTER TABLE {0} CHANGE {1} {1}_{0} CHAR(12);"""
+    cur.execute(command_s.format(new_table_s, join_s))
     
     print('Database {0} created.'.format(new_table_s))
     
@@ -148,13 +159,18 @@ class Budget(object):
                          for year in range(2007, 2015)}
                              
     def extract(self, year):
+
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+
         df = pd.read_excel(os.path.join(config.data_path, 'budgets',
                                         self.orig_table_s_d[year] + '.xlsx'))
         filtered_df = df[df['Aid Category'] == 'Sum of Above Aid Categories']
         trimmed_df = filtered_df.loc[:, ['BEDS Code', self.column_s[year]]]
-        trimmed_df.columns = ['district_{1}'.format(self.new_table_s),
+        trimmed_df.columns = ['district_{0}'.format(year),
                               '{1}_{0:d}'.format(year, self.new_table_s)]
-        utilities.write_to_sql_table(trimmed_df, self.new_table_s, 'joined')
+        final_df = trimmed_df.set_index('district_{0}'.format(year))
+        utilities.write_to_sql_table(final_df, 'temp{0:d}_final'.format(year),
+                                     'temp')
     
     
 
