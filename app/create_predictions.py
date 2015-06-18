@@ -12,8 +12,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-from sklearn.gaussian_process import GaussianProcess
+from sklearn import cross_validation
+#from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+#from sklearn.gaussian_process import GaussianProcess
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import Imputer
 
@@ -234,47 +235,136 @@ class SameChangeAsLastYear(object):
         
         
 def find_rms_error(Y, prediction_Y):
+    assert(Y.shape == prediction_Y.shape)
     valid_col_a = ~np.isnan(Y)
     return np.sqrt(np.mean((Y[valid_col_a] - prediction_Y[valid_col_a])**2))
     
     
     
-def fit_and_predict(array, Class, **kwargs):
+def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
     """ Given an array, fits it using Class and the optional options. """
     
     num_years_to_predict = len(config.prediction_year_l)    
     
     instance = Class()
     results_d = {}
-        
+     
+    
+    ## Training set: all years before the most recent
+    
+    # Fit on all years before the most recent
     results_d['result_object'] = instance.fit(array, holdout_col=1,
-                                              positive_control=False,
+                                              aux_data_a_d=aux_data_a_d,
                                               **kwargs)
+                                              
+    # Measure training set error
     last_fitted_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
+                         aux_data_a_d=aux_data_a_d,
                          holdout_col=2,
-                         positive_control=False,
                          **kwargs)
-    results_d['last_fitted_year_rms_error'] = find_rms_error(array[:, -2].reshape(-1),
+    results_d['train_rms_error'] = find_rms_error(array[:, -2].reshape(-1),
         last_fitted_year_prediction_a.reshape(-1))
+        
+    # Measure error of most recent year of data as a test set
     last_data_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
+                         aux_data_a_d=aux_data_a_d,
                          holdout_col=1,
-                         positive_control=False,
                          **kwargs)
-    results_d['last_data_year_rms_error'] = find_rms_error(array[:, -1].reshape(-1),
-        last_data_year_prediction_a.reshape(-1))    
+    results_d['test_rms_error'] = find_rms_error(array[:, -1].reshape(-1),
+        last_data_year_prediction_a.reshape(-1))   
+        
+    # Predict future values
     future_prediction_a = np.ndarray((array.shape[0], 0))
     for year in range(num_years_to_predict):
         combined_data_a = np.concatenate((array, future_prediction_a), axis=1)
         new_year_prediction_a = instance.predict(combined_data_a,
                                                  results_d['result_object'],
-                                                 positive_control=False,
+                                                 aux_data_a_d=aux_data_a_d,
                                                  **kwargs)
         future_prediction_a = np.concatenate((future_prediction_a,
                                               new_year_prediction_a), axis=1)
     results_d['prediction_a'] = future_prediction_a
     
+        
+    ## Perform 10-fold cross validation
+    
+    kf = cross_validation.KFold(array.shape[0], k=10)
+    cross_val_train_rmse_l = []
+    cross_val_test_rmse_l = []
+    for train_index, test_index in kf:
+        print('TRAIN:', train_index, 'TEST:', test_index)
+        
+        # Creating new aux dicts
+        if aux_data_a_d:
+            aux_train_a_d = {}
+            aux_test_a_d = {}
+            for key, val in aux_data_a_d.iteritems():
+                aux_train_a_d[key] = val[train_index, :]
+                aux_test_a_d[key] = val[test_index, :]
+        
+        # Train model
+        instance = Class()
+        result = instance.fit(array[train_index, :],
+                              holdout_col=0,
+                              aux_data_a_d=aux_train_a_d,
+                              **kwargs)
+
+        # Find train RMSE
+        train_prediction_a = instance.predict(array[train_index, :],
+                                        result,
+                                        aux_data_a_d=aux_train_a_d,
+                                        holdout_col=1,
+                                        **kwargs)
+        cross_val_train_rmse_l.append(find_rms_error(array[train_index, -1].reshape(-1),
+            train_prediction_a.reshape(-1)))
+                              
+        # Find test RMSE
+        test_prediction_a = instance.predict(array[test_index, :],
+                                        result,
+                                        aux_data_a_d=aux_test_a_d,
+                                        holdout_col=1,
+                                        **kwargs)
+        cross_val_test_rmse_l.append(find_rms_error(array[test_index, -1].reshape(-1),
+            test_prediction_a.reshape(-1)))
+    
+    print('Cross-val train RMSE:', cross_val_train_rmse_l)
+    print('Cross-val test RMSE:', cross_val_test_rmse_l)
+    results_d['cross_val_train_rms_error'] = np.mean(cross_val_train_rmse_l)
+    results_d['cross_val_test_rms_error'] = np.mean(cross_val_test_rmse_l)
+    
+    
+    ## Validating based on RMSE of prediction 3 years out
+    
+    # Fit on all years before the most recent 3
+    instance = Class()
+    result = instance.fit(array, holdout_col=3, 
+                          aux_data_a_d=aux_data_a_d,
+                          **kwargs)
+                                              
+    # Measure training set error
+    three_year_train_prediction_a = \
+        instance.predict(array, result,
+                         aux_data_a_d=aux_data_a_d,
+                         holdout_col=4,
+                         **kwargs)
+    results_d['three_year_train_rms_error'] = find_rms_error(array[:, -4].reshape(-1),
+        three_year_train_prediction_a.reshape(-1))
+        
+    # Measure error of most recent year of data as a test set
+    future_prediction_a = np.ndarray((array.shape[0], 0))
+    for year in range(3):
+        combined_data_a = np.concatenate((array[:, :-3], future_prediction_a), axis=1)
+        new_year_prediction_a = instance.predict(combined_data_a,
+                                                 result,
+                                                 aux_data_a_d=aux_data_a_d,
+                                                 **kwargs)
+        future_prediction_a = np.concatenate((future_prediction_a,
+                                              new_year_prediction_a), axis=1)
+    results_d['three_year_test_rms_error'] = find_rms_error(array[:, -1].reshape(-1),
+        last_data_year_prediction_a.reshape(-1))
+        
     return results_d
     
     
@@ -299,21 +389,23 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
     
     ## Run regression models, validate and predict future scores, and run controls    
     all_results_d = {}
-    lag_l = range(1, 6)
+    lag_l = range(1, 5)
     
     # Run autoregression with different lags on raw test scores
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
-                                                 diff=False, lag=lag)
+                                                 diff=False, lag=lag,
+                                                 positive_control=False)
     
     # Run autogression with different lags on diff of test scores w.r.t. year
     for lag in lag_l:
         model_s = 'diff_lag{:d}'.format(lag)
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
-                                                 diff=True, lag=lag)
+                                                 diff=True, lag=lag,
+                                                 positive_control=False)
 
     # Run control: prediction is same as mean over years in training set
     model_s = 'z_mean_over_years_score_control'
@@ -329,26 +421,45 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
 
     chosen_baseline_s_l = ['z_mean_over_years_score_control',               
                            'z_same_as_last_year_score_control']
-    all_train_mses_d = {key: value['last_fitted_year_rms_error'] for (key, value) in all_results_d.iteritems()}    
-    all_test_mses_d = {key: value['last_data_year_rms_error'] for (key, value) in all_results_d.iteritems()}
+    all_train_mses_d = {key: value['train_rms_error'] for (key, value) in all_results_d.iteritems()}    
+    all_test_mses_d = {key: value['test_rms_error'] for (key, value) in all_results_d.iteritems()}
     for key, value in all_test_mses_d.iteritems():
         for chosen_baseline_s in chosen_baseline_s_l:
             print('{0}: \n\t{1:1.5g} \n\t{2:1.5g}'.format(key, value, value/all_test_mses_d[chosen_baseline_s]))
     
     
     ## Plot MSEs of all regression models     
+    
     model_s_l = sorted(all_train_mses_d.keys())
-    train_mse_l = [all_train_mses_d[key] for key in model_s_l]
-    test_mse_l = [all_test_mses_d[key] for key in model_s_l]
-    bar_width = 0.35
-    train_index_a = np.arange(len(train_mse_l))
-    test_index_a = np.arange(bar_width, len(test_mse_l)+bar_width)
     fig = plt.figure(figsize=(1.5*len(model_s_l),12))
-    ax = fig.add_axes([0.10, 0.40, 0.80, 0.50]) 
-    ax.bar(train_index_a, train_mse_l, bar_width, color='r', label='Training')
-    ax.bar(test_index_a, test_mse_l, bar_width, color='b', label='Test')
+    ax = fig.add_axes([0.10, 0.40, 0.80, 0.50])
+    
+    # Generating bar values
+    value_s_l = ['train_rms_error', 'test_rms_error',
+               'cross_val_train_rms_error', 'cross_val_test_rms_error',
+               'three_year_train_rms_error', 'three_year_test_rms_error']
+    value_l_d = {}
+    for value_s in value_s_l:
+        value_l_d[value_s] = [all_results_d[iter_model_s][value_s]\
+                              for iter_model_s in model_s_l]
+    
+    # Generate bar positions
+    bar_width = 0.12
+    value_position_l_d = {}
+    for i_value, value_s in enumerate(value_s_l):
+        value_position_l_d[value_s] = np.arange(len(model_s_l)) + (i_value-3)*bar_width
+        
+    # Generate colors
+    value_color_l = ['r', 'y', 'g', 'c', 'b', 'm']
+    
+    # Plot bars
+    for i_value, value_s in enumerate(value_s_l):
+        ax.bar(value_position_l_d[value_s], value_l_d[value_s], bar_width,
+               color=value_color_l[i_value], label=value_s)
+    
+    # Formatting
     ax.set_title('Comparison of RMS error of autoregression algorithms vs. controls')
-    ax.set_xticks(np.arange(len(test_mse_l))+bar_width)
+    ax.set_xticks(np.arange(len(model_s_l)))
     ax.set_xticklabels(model_s_l, rotation=90)
     ax.set_ylabel('Root mean squared error')
     ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.50))
