@@ -15,7 +15,7 @@ import pandas as pd
 from sklearn import cross_validation
 #from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 #from sklearn.gaussian_process import GaussianProcess
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import ElasticNetCV, LinearRegression
 from sklearn.preprocessing import Imputer
 
 import config
@@ -27,7 +27,7 @@ reload(utilities)
 
 
 
-def main():
+def main(**kwargs):
     
     
     ## Read in data    
@@ -47,7 +47,7 @@ def main():
                                                         
     ## Run prediction over all features
     for feature_s in data_a_d.iterkeys():
-        predict_a_feature(data_a_d, feature_s, aux_features=False, positive_control=False)   
+        predict_a_feature(data_a_d, feature_s, **kwargs)   
         
     
 
@@ -115,12 +115,18 @@ class AutoRegression(object):
         X = estimatorX.fit_transform(X)
         estimatorY = Imputer(axis=0)
         Y = estimatorY.fit_transform(Y.reshape(-1, 1)).reshape(-1)
-        
-        model = LinearRegression(fit_intercept=True, normalize=True)
+
+        l1_ratio_l = [.1, .5, .7, .9, .95, .99, 1]
+        alpha_l = np.logspace(-15, 5, num=11).tolist()        
+        model = ElasticNetCV(l1_ratio=l1_ratio_l, alphas=alpha_l,
+                             fit_intercept=True, normalize=True)
+#        model = LinearRegression(fit_intercept=True, normalize=True)
 #        model = RandomForestRegressor(max_features='auto')
 #        model = GradientBoostingRegressor(max_features='sqrt')
         model.fit(X, Y)
         print('Lag of {0:d}:'.format(lag))
+        print('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
+              (model.score(X, Y), model.l1_ratio_, model.alpha_))
         print(model.coef_)
         
         return model
@@ -369,7 +375,7 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
         future_prediction_a = np.concatenate((future_prediction_a,
                                               new_year_prediction_a), axis=1)
     results_d['three_year_test_rms_error'] = find_rms_error(array[:, -1].reshape(-1),
-        last_data_year_prediction_a.reshape(-1))
+        future_prediction_a[:, -1].reshape(-1))
         
     return results_d
     
@@ -393,7 +399,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     ## Split data
     main_data_a = data_a_d[primary_feature_s]
     data_a_d.pop(primary_feature_s)
-    if ~aux_features:
+    if not aux_features:
         data_a_d = {}
     
     
@@ -490,7 +496,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     
     
     ## Save data to the SQL database
-    model_to_save_s = 'raw_lag1'
+    model_to_save_s = 'raw_lag4'
     new_column_s_l = ['ENTITY_CD'] + \
         ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
          for year in config.prediction_year_l]
@@ -504,4 +510,4 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
 
     
 if __name__ == '__main__':
-    main()
+    main(aux_features=True, positive_control=False)
