@@ -58,8 +58,8 @@
 
     <div class="starter-template">
         <h2><center>Schoolstradamus</center></h2>
-      <h3><center>Forecasting a school's future test scores</center></h3>
-        <p>Enter two high schools in the State of New York, and this website will predict the percentage of students from each school that will pass the Regents Exams a few years from now.</p>
+      <h3><center>Forecasting a school's future performance</center></h3>
+        <p>Enter two high schools in the State of New York, and select the school-related statistic you want to predict.</p>
     </div>
 
     <div class = "container">
@@ -67,10 +67,21 @@
       <form action="/output" method="GET">
         <div class="form-group">
           <label for="Name1"><font color="red">School Name 1:</font></label>
-          <input type="text" id="Name1" name='Name1' placeholder=" e.g. Downsville Central School" style="width:320px">
+          <input type="text" id="Name1" name='Name1' placeholder=" e.g. Binghamton High School" style="width:320px">
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
-          <input type="text" id="Name2" name='Name2' placeholder=" e.g. Canajoharie Senior High School" style="width:320px">
+          <input type="text" id="Name2" name='Name2' placeholder=" e.g. Elmira High School" style="width:320px">
+        <br>
+          <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
+          <select id="Feature" name="Feature" class="input-xlarge">
+            {% for dropdown_s in dropdown_s_l %}
+            {% if dropdown_s == 'Regents Exams pass rate' %}
+            <option selected="selected">{{ dropdown_s }}</option>
+            {% else %}
+            <option>{{ dropdown_s }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
         </div>
         <div>
           <button type="submit" class="btn btn-default btn-lg">Make prediction</button>

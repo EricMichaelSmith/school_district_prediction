@@ -15,7 +15,8 @@ import join_data
 @app.route('/index')
 @app.route('/input')
 def schools_input():
-  return render_template("input.html")
+  return render_template("input.html",
+                         dropdown_s_l = dropdown_s_l)
 
 
 
@@ -29,14 +30,10 @@ def schools_output():
     for database_s, val in all_database_stats_d.iteritems():
         if all_database_stats_d[database_s]['explanatory_name'] == Feature:
             feature_s = database_s
-
-
-    ## Information for dropdown list
-    dropdown_s_l = []
-    for database_s in all_database_stats_d.iterkeys():
-        if all_database_stats_d[database_s]['allow_prediction']:
-            dropdown_s_l.append(all_database_stats_d[database_s]['explanatory_name'])
-    dropdown_s_l = sorted(dropdown_s_l)
+            
+    feature_d = all_database_stats_d[feature_s]
+    
+    default_dropdown_s = feature_d['explanatory_name']
 
 
     ## Information for time trace plot and for output text
@@ -54,20 +51,33 @@ def schools_output():
     else:
         year_s = 'years'
     if school1_predicted_difference > 0:
-        output_message_s = "Prediction: School 1's average passing rate will be {0:0.1f}% higher in {1:d} {2}.".format(school1_predicted_difference*100,
-                             num_years_prediction, year_s)
+        output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
+            feature_d['output_format_2_s'],
+            num_years_prediction,
+            year_s, Name1)
+        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
         output_message_color_s = 'red'
     elif school1_predicted_difference < 0:
-        output_message_s = "Prediction: School 2's average passing rate will be {0:0.1f}% higher in {1:d} {2}.".format(-school1_predicted_difference*100,
-                             num_years_prediction, year_s)
+        output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
+            feature_d['output_format_2_s'],
+            num_years_prediction,
+            year_s, Name2)
+        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
         output_message_color_s = 'blue'
     else:
-        output_message_s = "Prediction: both schools' test scores will be equal in {0:d} {1}.".format(num_years_prediction, year_s)
+        output_message_s = "Prediction: the {0} of both schools will be equal in {2:d} {3}.".format(feature_d['output_format_1_s'],
+            feature_d['output_format_2_s'],
+            num_years_prediction,
+            year_s)
+        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
         output_message_color_s = 'black'
 
     return render_template("output.html",
                            dropdown_s_l = dropdown_s_l,
+                           default_dropdown_s = default_dropdown_s,
                            feature_s = feature_s,
+                           Name1 = Name1,
+                           Name2 = Name2,
                            schools1_past = schools1_past,
                            schools2_past = schools2_past,
                            output_message_s = output_message_s,
@@ -171,3 +181,10 @@ def query_prediction_scores(feature_s, ID):
     
 db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
 all_database_stats_d = join_data.collect_database_stats()
+
+## Information for dropdown list
+dropdown_s_l = []
+for database_s in all_database_stats_d.iterkeys():
+    if all_database_stats_d[database_s]['allow_prediction']:
+        dropdown_s_l.append(all_database_stats_d[database_s]['explanatory_name'])
+dropdown_s_l = sorted(dropdown_s_l)

@@ -59,7 +59,7 @@
     <div class="starter-template">
         <h2><center>Schoolstradamus</center></h2>
       <h3><center>Forecasting a school's future performance</center></h3>
-        <p>Enter two high schools in the State of New York, and this website will predict the percentage of students from each school that will pass the Regents Exams a few years from now. [[[Change this text to reflect dropdown menu]]]</p>
+        <p>Enter two high schools in the State of New York, and select the school-related statistic you want to predict.</p>
     </div>
 
     <div class = "container">
@@ -67,15 +67,19 @@
       <form action="/output" method="GET">
         <div class="form-group">
           <label for="Name1"><font color="red">School Name 1:</font></label>
-          <input type="text" id="Name1" name='Name1' placeholder=" e.g. Downsville Central School" style="width:320px">
+          <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:320px">
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
-          <input type="text" id="Name2" name='Name2' placeholder=" e.g. Canajoharie Senior High School" style="width:320px">
+          <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:320px">
         <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
           <select id="Feature" name="Feature" class="input-xlarge">
             {% for dropdown_s in dropdown_s_l %}
+            {% if dropdown_s == default_dropdown_s %}
+            <option selected="selected">{{ dropdown_s }}</option>
+            {% else %}
             <option>{{ dropdown_s }}</option>
+            {% endif %}
             {% endfor %}
           </select>
         </div>
@@ -91,7 +95,7 @@
 
     <div class="container">
       <div class="starter-template">
-        <h3>Predicted test scores:</h3>
+        <h3>Prediction:</h3>
         <img src="http://127.0.0.1:5000/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"/>
       </div>
       <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
