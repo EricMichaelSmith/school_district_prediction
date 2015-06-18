@@ -47,7 +47,7 @@ def main():
                                                         
     ## Run prediction over all features
     for feature_s in data_a_d.iterkeys():
-        predict_a_feature(data_a_d, feature_s)   
+        predict_a_feature(data_a_d, feature_s, aux_features=False, positive_control=False)   
         
     
 
@@ -163,7 +163,9 @@ class AutoRegression(object):
             estimatorX = Imputer(axis=0)
             X = estimatorX.fit_transform(X)
             predicted_change_a = results.predict(X)
-            prediction_a = prediction_raw_array[:, -1] + predicted_change_a
+            estimator_orig = Imputer(axis=0)
+            orig_a = estimator_orig.fit_transform(prediction_raw_array[:, -1].reshape(-1,1))
+            prediction_a = orig_a + predicted_change_a.reshape(-1, 1)
         else:
             array = raw_array
             X = array[:, -lag:]
@@ -290,11 +292,11 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
         
     ## Perform 10-fold cross validation
     
-    kf = cross_validation.KFold(array.shape[0], k=10)
+    kf = cross_validation.KFold(array.shape[0], n_folds=10, shuffle=True)
     cross_val_train_rmse_l = []
     cross_val_test_rmse_l = []
     for train_index, test_index in kf:
-        print('TRAIN:', train_index, 'TEST:', test_index)
+#        print('TRAIN:', len(train_index), 'TEST:', len(test_index))
         
         # Creating new aux dicts
         if aux_data_a_d:
@@ -303,6 +305,10 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
             for key, val in aux_data_a_d.iteritems():
                 aux_train_a_d[key] = val[train_index, :]
                 aux_test_a_d[key] = val[test_index, :]
+        else:
+            aux_train_a_d = None
+            aux_test_a_d = None
+            
         
         # Train model
         instance = Class()
@@ -329,8 +335,8 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
         cross_val_test_rmse_l.append(find_rms_error(array[test_index, -1].reshape(-1),
             test_prediction_a.reshape(-1)))
     
-    print('Cross-val train RMSE:', cross_val_train_rmse_l)
-    print('Cross-val test RMSE:', cross_val_test_rmse_l)
+#    print('Cross-val train RMSE:', cross_val_train_rmse_l)
+#    print('Cross-val test RMSE:', cross_val_test_rmse_l)
     results_d['cross_val_train_rms_error'] = np.mean(cross_val_train_rmse_l)
     results_d['cross_val_test_rms_error'] = np.mean(cross_val_test_rmse_l)
     
@@ -369,7 +375,9 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
     
     
 
-def predict_a_feature(input_data_a_d, primary_feature_s):
+def predict_a_feature(input_data_a_d, primary_feature_s,
+                      aux_features=True,
+                      **kwargs):
     
     print('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
     
@@ -385,38 +393,46 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
     ## Split data
     main_data_a = data_a_d[primary_feature_s]
     data_a_d.pop(primary_feature_s)
+    if ~aux_features:
+        data_a_d = {}
     
     
     ## Run regression models, validate and predict future scores, and run controls    
     all_results_d = {}
-    lag_l = range(1, 5)
     
     # Run autoregression with different lags on raw test scores
+    lag_l = range(1, 5)
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
+        print(model_s + ':')
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
                                                  diff=False, lag=lag,
-                                                 positive_control=False)
+                                                 **kwargs)
     
     # Run autogression with different lags on diff of test scores w.r.t. year
+    lag_l = range(1, 4)
     for lag in lag_l:
         model_s = 'diff_lag{:d}'.format(lag)
+        print(model_s + ':')
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
                                                  diff=True, lag=lag,
-                                                 positive_control=False)
+                                                 **kwargs)
 
     # Run control: prediction is same as mean over years in training set
     model_s = 'z_mean_over_years_score_control'
+    print(model_s + ':')
     all_results_d[model_s] = fit_and_predict(main_data_a, MeanOverYears)
     
     # Run control: prediction is same as previous year's data
     model_s = 'z_same_as_last_year_score_control'
+    print(model_s + ':')
     all_results_d[model_s] = fit_and_predict(main_data_a, SameAsLastYear)
     
     # Run control: prediction is same as previous year's data
     model_s = 'z_same_change_as_last_year_score_control'
+    print(model_s + ':')
     all_results_d[model_s] = fit_and_predict(main_data_a, SameChangeAsLastYear)
 
     chosen_baseline_s_l = ['z_mean_over_years_score_control',               
@@ -466,7 +482,11 @@ def predict_a_feature(input_data_a_d, primary_feature_s):
     for chosen_baseline_s in chosen_baseline_s_l:
         ax.axhline(y=all_test_mses_d[chosen_baseline_s], color=(0.5, 0.5, 0.5))
     ax.set_ylim([0, 1.5*all_test_mses_d['z_mean_over_years_score_control']])
-    plt.savefig(os.path.join(config.plot_path, 'create_predictions', 'rms_error_all_models__{0}.png'.format(primary_feature_s)))
+    save_path = os.path.join(config.plot_path, 'create_predictions')
+    if not os.path.isdir(save_path):
+        os.mkdir(save_path)
+    plt.savefig(os.path.join(save_path,
+                             'rms_error_all_models__{0}.png'.format(primary_feature_s)))
     
     
     ## Save data to the SQL database
