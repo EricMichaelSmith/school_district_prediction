@@ -58,8 +58,8 @@
 
     <div class="starter-template">
         <h2><center>Schoolstradamus</center></h2>
-      <h3><center>Forecasting a school's future test scores</center></h3>
-        <p>Enter two high schools in the State of New York, and this website will predict the percentage of students from each school that will pass the Regents Exams a few years from now.</p>
+      <h3><center>Forecasting a school's future performance</center></h3>
+        <p>Enter two high schools in the State of New York, and this website will predict the percentage of students from each school that will pass the Regents Exams a few years from now. [[[Change this text to reflect dropdown menu]]]</p>
     </div>
 
     <div class = "container">
@@ -71,6 +71,13 @@
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
           <input type="text" id="Name2" name='Name2' placeholder=" e.g. Canajoharie Senior High School" style="width:320px">
+        <br>
+          <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
+          <select id="Feature" name="Feature" class="input-xlarge">
+            {% for dropdown_s in dropdown_s_l %}
+            <option>{{ dropdown_s }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div>
           <button type="submit" class="btn btn-default btn-lg">Make prediction</button>
@@ -85,7 +92,7 @@
     <div class="container">
       <div class="starter-template">
         <h3>Predicted test scores:</h3>
-        <img src="http://127.0.0.1:5000/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}"/>
+        <img src="http://127.0.0.1:5000/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"/>
       </div>
       <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
 

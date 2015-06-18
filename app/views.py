@@ -24,11 +24,28 @@ def schools_output():
     #pull 'Name1' and 'Name2' from input field and store them
     Name1 = request.args.get('Name1')
     Name2 = request.args.get('Name2')
+    Feature = request.args.get('Feature')
+    
+    for database_s, val in all_database_stats_d.iteritems():
+        if all_database_stats_d[database_s]['explanatory_name'] == Feature:
+            feature_s = database_s
 
-    schools1_past = query_past_scores(name=Name1)
-    schools1_prediction = query_prediction_scores(ID=schools1_past[0]['school_id'])
-    schools2_past = query_past_scores(name=Name2)
-    schools2_prediction = query_prediction_scores(ID=schools2_past[0]['school_id']) 
+
+    ## Information for dropdown list
+    dropdown_s_l = []
+    for database_s in all_database_stats_d.iterkeys():
+        if all_database_stats_d[database_s]['allow_prediction']:
+            dropdown_s_l.append(all_database_stats_d[database_s]['explanatory_name'])
+    dropdown_s_l = sorted(dropdown_s_l)
+
+
+    ## Information for time trace plot and for output text
+    schools1_past = query_past_scores(feature_s, name=Name1)
+    schools1_prediction = query_prediction_scores(feature_s, 
+                                                  ID=schools1_past[0]['school_id'])
+    schools2_past = query_past_scores(feature_s, name=Name2)
+    schools2_prediction = query_prediction_scores(feature_s,
+                                                  ID=schools2_past[0]['school_id']) 
     school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
         schools2_prediction[0]['score_l'][-1]
     num_years_prediction = len(schools1_prediction[0]['score_l'])
@@ -49,6 +66,8 @@ def schools_output():
         output_message_color_s = 'black'
 
     return render_template("output.html",
+                           dropdown_s_l = dropdown_s_l,
+                           feature_s = feature_s,
                            schools1_past = schools1_past,
                            schools2_past = schools2_past,
                            output_message_s = output_message_s,
@@ -61,7 +80,7 @@ def plot():
 
     ID1 = request.args.get('ID1')
     ID2 = request.args.get('ID2')
-    feature_s = request.args.get('feature')
+    feature_s = request.args.get('Feature')
     
     schools1_past = query_past_scores(feature_s, ID=ID1)
     schools1_prediction = query_prediction_scores(feature_s, ID=ID1)
@@ -73,16 +92,18 @@ def plot():
     fig.patch.set_facecolor('white')
     axis = fig.add_axes([0.1, 0.23, 0.8, 0.67])
  
-    curve1, = axis.plot(config.year_l, np.array(schools1_past[0]['score_l'])*100, 'r')
-    curve2, = axis.plot(config.year_l, np.array(schools2_past[0]['score_l'])*100, 'b')
+    curve1, = axis.plot(config.year_l,
+        np.array(schools1_past[0]['score_l'])*feature_d['multiplier'], 'r')
+    curve2, = axis.plot(config.year_l,
+        np.array(schools2_past[0]['score_l'])*feature_d['multiplier'], 'b')
     schools1_extrapolation_l = schools1_past[0]['score_l'][-1:] + \
         schools1_prediction[0]['score_l']
     schools2_extrapolation_l = schools2_past[0]['score_l'][-1:] + \
         schools2_prediction[0]['score_l']
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
-              np.array(schools1_extrapolation_l)*100, 'r--')
+              np.array(schools1_extrapolation_l)*feature_d['multiplier'], 'r--')
     axis.plot(config.year_l[-1:]+config.prediction_year_l,
-              np.array(schools2_extrapolation_l)*100, 'b--')
+              np.array(schools2_extrapolation_l)*feature_d['multiplier'], 'b--')
     axis.set_xlabel('Year')
     axis.set_xlim([config.year_l[0], config.prediction_year_l[-1]])
     axis.set_title(feature_d['description_s'])
@@ -95,23 +116,6 @@ def plot():
     response = make_response(output.getvalue())
     response.mimetype = 'image/png'
     return response
-    
-
-
-def collect_database_stats():
-    all_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
-    all_database_stats_d = {}
-    for Database in all_Database_l:
-        instance = Database()
-        d = {}
-        d['description_s'] = instance.description_s
-        d['explanatory_name'] = instance.explanatory_name
-        d['multiplier'] = instance.multiplier
-        d['new_table_s'] = instance.new_table_s
-        d['orig_table_s_d'] = instance.orig_table_s_d
-        d['allow_prediction'] = instance.allow_prediction
-        all_database_stats_d[instance.new_table_s] = d
-    return all_database_stats_d
         
         
 
@@ -119,6 +123,7 @@ def query_past_scores(feature_s, ID=None, name=None):
     with db:
         cur = db.cursor()
         #just select the city from 'master' that the user inputs
+        cur.execute('USE joined;')
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
         for year in config.year_l:
             command_s += '{0}_{1:d}, '.format(feature_s, year)
@@ -144,6 +149,7 @@ def query_prediction_scores(feature_s, ID):
     with db:
         cur = db.cursor()
         #just select the city from 'master' that the user inputs
+        cur.execute('USE joined;')
         command_s = 'SELECT ENTITY_CD, '
         for year in config.prediction_year_l:
             command_s += '{0}_prediction_{1:d}, '.format(feature_s,
@@ -164,4 +170,4 @@ def query_prediction_scores(feature_s, ID):
     
     
 db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
-all_database_stats_d = collect_database_stats()
+all_database_stats_d = join_data.collect_database_stats()

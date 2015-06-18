@@ -43,6 +43,23 @@ def main():
     with con:
         cur = con.cursor()
         join_databases(cur, Database_l, DistrictDatabase_l)
+        
+        
+        
+def collect_database_stats():
+    all_Database_l = Database_l + DistrictDatabase_l
+    all_database_stats_d = {}
+    for Database in all_Database_l:
+        instance = Database()
+        d = {}
+        d['description_s'] = instance.description_s
+        d['explanatory_name'] = instance.explanatory_name
+        d['multiplier'] = instance.multiplier
+        d['new_table_s'] = instance.new_table_s
+        d['orig_table_s_d'] = instance.orig_table_s_d
+        d['allow_prediction'] = instance.allow_prediction
+        all_database_stats_d[instance.new_table_s] = d
+    return all_database_stats_d
 
 
 
@@ -692,7 +709,7 @@ class TurnoverRate(object):
         self.multiplier = 100
         self.new_table_s = 'turnover_rate'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
-        self.allow_prediction = True
+        self.allow_prediction = False
 
         
     def extract(self, cur, year):
