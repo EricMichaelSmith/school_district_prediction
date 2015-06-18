@@ -9,10 +9,6 @@ import StringIO
 import config
 import join_data
 
-db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
-
-plot_instance = join_data.RegentsPassRate()
-
 
 
 @app.route('/')
@@ -65,11 +61,13 @@ def plot():
 
     ID1 = request.args.get('ID1')
     ID2 = request.args.get('ID2')
+    feature_s = request.args.get('feature')
     
-    schools1_past = query_past_scores(ID=ID1)
-    schools1_prediction = query_prediction_scores(ID=ID1)
-    schools2_past = query_past_scores(ID=ID2)
-    schools2_prediction = query_prediction_scores(ID=ID2)        
+    schools1_past = query_past_scores(feature_s, ID=ID1)
+    schools1_prediction = query_prediction_scores(feature_s, ID=ID1)
+    schools2_past = query_past_scores(feature_s, ID=ID2)
+    schools2_prediction = query_prediction_scores(feature_s, ID=ID2)   
+    feature_d = all_database_stats_d[feature_s]     
 
     fig = plt.Figure()
     fig.patch.set_facecolor('white')
@@ -87,7 +85,7 @@ def plot():
               np.array(schools2_extrapolation_l)*100, 'b--')
     axis.set_xlabel('Year')
     axis.set_xlim([config.year_l[0], config.prediction_year_l[-1]])
-    axis.set_title(plot_instance.description_s)
+    axis.set_title(feature_d['description_s'])
     axis.ticklabel_format(useOffset=False)
     axis.legend([curve1, curve2], [schools1_past[0]['name'], schools2_past[0]['name']],
                 loc='upper center', bbox_to_anchor=(0.5, -0.12), frameon=False)
@@ -98,15 +96,32 @@ def plot():
     response.mimetype = 'image/png'
     return response
     
-    
 
-def query_past_scores(ID=None, name=None):
+
+def collect_database_stats():
+    all_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
+    all_database_stats_d = {}
+    for Database in all_Database_l:
+        instance = Database()
+        d = {}
+        d['description_s'] = instance.description_s
+        d['explanatory_name'] = instance.explanatory_name
+        d['multiplier'] = instance.multiplier
+        d['new_table_s'] = instance.new_table_s
+        d['orig_table_s_d'] = instance.orig_table_s_d
+        d['allow_prediction'] = instance.allow_prediction
+        all_database_stats_d[instance.new_table_s] = d
+    return all_database_stats_d
+        
+        
+
+def query_past_scores(feature_s, ID=None, name=None):
     with db:
         cur = db.cursor()
         #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
         for year in config.year_l:
-            command_s += '{0}_{1:d}, '.format(plot_instance.new_table_s, year)
+            command_s += '{0}_{1:d}, '.format(feature_s, year)
         command_s = command_s[:-2]
         if ID:
             command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)            
@@ -125,17 +140,17 @@ def query_past_scores(ID=None, name=None):
     
     
     
-def query_prediction_scores(ID):
+def query_prediction_scores(feature_s, ID):
     with db:
         cur = db.cursor()
         #just select the city from 'master' that the user inputs
         command_s = 'SELECT ENTITY_CD, '
         for year in config.prediction_year_l:
-            command_s += '{0}_prediction_{1:d}, '.format(plot_instance.new_table_s,
+            command_s += '{0}_prediction_{1:d}, '.format(feature_s,
                                                            year)
         command_s = command_s[:-2]
         command_s += " FROM {0}_prediction WHERE ENTITY_CD='{1}';"\
-            .format(plot_instance.new_table_s, ID)
+            .format(feature_s, ID)
         cur.execute(command_s.format(ID))
         query_results = cur.fetchall()
 
@@ -145,3 +160,8 @@ def query_prediction_scores(ID):
                             score_l=result[1:]))
     
     return schools
+    
+    
+    
+db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
+all_database_stats_d = collect_database_stats()
