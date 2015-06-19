@@ -67,10 +67,10 @@
       <form action="/output" method="GET">
         <div class="form-group">
           <label for="Name1"><font color="red">School Name 1:</font></label>
-          <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:320px">
+          <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:420px">
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
-          <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:320px">
+          <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px">
         <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
           <select id="Feature" name="Feature" class="input-xlarge">
@@ -95,7 +95,6 @@
 
     <div class="container">
       <div class="starter-template">
-        <h3>Prediction:</h3>
         <img src="http://127.0.0.1:5000/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"/>
       </div>
       <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>

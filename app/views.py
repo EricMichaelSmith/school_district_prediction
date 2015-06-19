@@ -141,7 +141,7 @@ def query_past_scores(feature_s, ID=None, name=None):
         if ID:
             command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)            
         elif name:
-            command_s += " FROM master WHERE ENTITY_NAME LIKE '{0}%';"\
+            command_s += " FROM master WHERE ENTITY_NAME LIKE '%{0}%';"\
                 .format(name.upper())
         cur.execute(command_s)
         query_results = cur.fetchall()
