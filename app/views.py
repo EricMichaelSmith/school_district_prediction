@@ -7,6 +7,7 @@ import pymysql as mdb
 import StringIO
 
 import config
+import config_unsynced
 import join_data
 
 
@@ -179,7 +180,8 @@ def query_prediction_scores(feature_s, ID):
     
     
     
-db = mdb.connect(user="root", host="localhost", db="joined", charset='utf8')
+db = mdb.connect(user="root", passwd=config_unsynced.pword_s,
+                 host="localhost", db="joined", charset='utf8')
 all_database_stats_d = join_data.collect_database_stats()
 
 ## Information for dropdown list
