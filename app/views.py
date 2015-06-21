@@ -21,6 +21,12 @@ def schools_input():
 
 
 
+@app.route('/error')
+def error():
+    return render_template('error.html')
+
+
+
 @app.route('/output')
 def schools_output():
     #pull 'Name1' and 'Name2' from input field and store them
@@ -39,50 +45,55 @@ def schools_output():
 
     ## Information for time trace plot and for output text
     schools1_past = query_past_scores(feature_s, name=Name1)
-    schools1_prediction = query_prediction_scores(feature_s, 
-                                                  ID=schools1_past[0]['school_id'])
     schools2_past = query_past_scores(feature_s, name=Name2)
-    schools2_prediction = query_prediction_scores(feature_s,
-                                                  ID=schools2_past[0]['school_id']) 
-    school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
-        schools2_prediction[0]['score_l'][-1]
-    num_years_prediction = len(schools1_prediction[0]['score_l'])
-    if num_years_prediction == 1:
-        year_s = 'year'
+                                                  
+    if (not schools1_past) or (not schools2_past):
+        return render_template('error.html')
     else:
-        year_s = 'years'
-    if school1_predicted_difference > 0:
-        output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
-            feature_d['output_format_2_s'],
-            num_years_prediction,
-            year_s, Name1)
-        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
-        output_message_color_s = 'red'
-    elif school1_predicted_difference < 0:
-        output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
-            feature_d['output_format_2_s'],
-            num_years_prediction,
-            year_s, Name2)
-        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
-        output_message_color_s = 'blue'
-    else:
-        output_message_s = "Prediction: the {0} of both schools will be equal in {2:d} {3}.".format(feature_d['output_format_1_s'],
-            feature_d['output_format_2_s'],
-            num_years_prediction,
-            year_s)
-        output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
-        output_message_color_s = 'black'
+        schools1_prediction = query_prediction_scores(feature_s, 
+                                                      ID=schools1_past[0]['school_id'])
+        schools2_prediction = query_prediction_scores(feature_s,
+                                                      ID=schools2_past[0]['school_id'])
+                                                  
+        school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
+            schools2_prediction[0]['score_l'][-1]
+        num_years_prediction = len(schools1_prediction[0]['score_l'])
+        if num_years_prediction == 1:
+            year_s = 'year'
+        else:
+            year_s = 'years'
+        if school1_predicted_difference > 0:
+            output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
+                feature_d['output_format_2_s'],
+                num_years_prediction,
+                year_s, Name1)
+            output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
+            output_message_color_s = 'red'
+        elif school1_predicted_difference < 0:
+            output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
+                feature_d['output_format_2_s'],
+                num_years_prediction,
+                year_s, Name2)
+            output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
+            output_message_color_s = 'blue'
+        else:
+            output_message_s = "Prediction: the {0} of both schools will be equal in {2:d} {3}.".format(feature_d['output_format_1_s'],
+                feature_d['output_format_2_s'],
+                num_years_prediction,
+                year_s)
+            output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
+            output_message_color_s = 'black'
 
-    return render_template("output.html",
-                           dropdown_s_l = dropdown_s_l,
-                           default_dropdown_s = default_dropdown_s,
-                           feature_s = feature_s,
-                           Name1 = Name1,
-                           Name2 = Name2,
-                           schools1_past = schools1_past,
-                           schools2_past = schools2_past,
-                           output_message_s = output_message_s,
-                           output_message_color_s = output_message_color_s)
+        return render_template("output.html",
+                               dropdown_s_l = dropdown_s_l,
+                               default_dropdown_s = default_dropdown_s,
+                               feature_s = feature_s,
+                               Name1 = Name1,
+                               Name2 = Name2,
+                               schools1_past = schools1_past,
+                               schools2_past = schools2_past,
+                               output_message_s = output_message_s,
+                               output_message_color_s = output_message_color_s)
         
                          
 
@@ -93,11 +104,11 @@ def plot():
     ID2 = request.args.get('ID2')
     feature_s = request.args.get('Feature')
     
+    feature_d = all_database_stats_d[feature_s]
     schools1_past = query_past_scores(feature_s, ID=ID1)
     schools1_prediction = query_prediction_scores(feature_s, ID=ID1)
     schools2_past = query_past_scores(feature_s, ID=ID2)
     schools2_prediction = query_prediction_scores(feature_s, ID=ID2)   
-    feature_d = all_database_stats_d[feature_s]     
 
     fig = plt.Figure()
     fig.patch.set_facecolor('white')

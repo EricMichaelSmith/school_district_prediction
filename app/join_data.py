@@ -60,6 +60,8 @@ def collect_database_stats():
         d['new_table_s'] = instance.new_table_s
         d['orig_table_s_d'] = instance.orig_table_s_d
         d['allow_prediction'] = instance.allow_prediction
+        d['in_metric'] = instance.in_metric
+        d['metric_weight'] = instance.metric_weight
         all_database_stats_d[instance.new_table_s] = d
     return all_database_stats_d
 
