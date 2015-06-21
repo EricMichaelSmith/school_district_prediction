@@ -109,10 +109,10 @@ def schools_output():
                 prediction_1_d_l = query_prediction_scores(feature_s, ID=schools1[0]['school_id'])
                 past_2_d_l = query_past_scores(feature_s, ID=schools2[0]['school_id'])
                 prediction_2_d_l = query_prediction_scores(feature_s, ID=schools2[0]['school_id'])
-                if not np.any(np.isnan(past_1_d_l[0]['score_l'])) and \
-                    not np.any(np.isnan(prediction_1_d_l[0]['score_l'])) and \
-                    not np.any(np.isnan(past_2_d_l[0]['score_l'])) and \
-                    not np.any(np.isnan(prediction_2_d_l[0]['score_l'])):
+                if not np.any(np.isnan(np.array(past_1_d_l[0]['score_l']))) and \
+                    not np.any(np.isnan(np.array(prediction_1_d_l[0]['score_l']))) and \
+                    not np.any(np.isnan(np.array(past_2_d_l[0]['score_l']))) and \
+                    not np.any(np.isnan(np.array(prediction_2_d_l[0]['score_l']))):
                         past_1_d[feature_s] = past_1_d_l[0]['score_l']
                         prediction_1_d[feature_s] = prediction_1_d_l[0]['score_l']
                         past_2_d[feature_s] = past_2_d_l[0]['score_l']

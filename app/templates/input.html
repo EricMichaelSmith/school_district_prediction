@@ -60,7 +60,7 @@
     <div class="starter-template">
         <h2><center>Schoolstradamus</center></h2>
       <h3><center>Forecasting a school's future performance</center></h3>
-        <p>Enter two high schools in the State of New York, and select the school-related statistic you want to predict.</p>
+        <p>Enter two high schools in the State of New York, and this website will predict the quality of the school on various metrics three years from now.</p>
     </div>
 
     <div class = "container">
@@ -72,17 +72,6 @@
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
           <input type="text" id="Name2" name='Name2' placeholder=" e.g. Bushwick Leaders HS for Academic Excellence" style="width:420px">
-        <br>
-          <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
-          <select id="Feature" name="Feature" class="input-xlarge">
-            {% for dropdown_s in dropdown_s_l %}
-            {% if dropdown_s == 'Regents Exams pass rate' %}
-            <option selected="selected">{{ dropdown_s }}</option>
-            {% else %}
-            <option>{{ dropdown_s }}</option>
-            {% endif %}
-            {% endfor %}
-          </select>
         </div>
         <div>
           <button type="submit" class="btn btn-default btn-lg">Make prediction</button>
