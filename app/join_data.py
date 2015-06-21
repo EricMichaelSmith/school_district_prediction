@@ -3,6 +3,7 @@
 Join all data in SQL databases
 """
 
+import numpy as np
 import os
 import pandas as pd
 
@@ -55,6 +56,7 @@ def collect_database_stats():
         d['description_s'] = instance.description_s
         d['explanatory_name'] = instance.explanatory_name
         d['multiplier'] = instance.multiplier
+        d['range_l'] = instance.range_l
         d['output_format_1_s'] = instance.output_format_1_s
         d['output_format_2_s'] = instance.output_format_2_s
         d['new_table_s'] = instance.new_table_s
@@ -62,6 +64,7 @@ def collect_database_stats():
         d['allow_prediction'] = instance.allow_prediction
         d['in_metric'] = instance.in_metric
         d['metric_weight'] = instance.metric_weight
+        d['bar_plot_s'] = instance.bar_plot_s
         all_database_stats_d[instance.new_table_s] = d
     return all_database_stats_d
 
@@ -175,6 +178,7 @@ class Budget(object):
         self.description_s = 'Annual budget of school district\n(thousands of dollars)'
         self.explanatory_name = 'Budget'
         self.multiplier = 0.001
+        self.range_l = [0, np.inf]
         self.output_format_1_s = 'school district budget'
         self.output_format_2_s = '{:0.0f} thousand dollars'
         self.new_table_s = 'budget'
@@ -184,6 +188,10 @@ class Budget(object):
         self.column_s = {year:'{0:d}-{1:02.0f}'.format(year-1, year-2000)
                          for year in range(2007, 2015)}
         self.allow_prediction = True
+        self.in_metric = False
+        self.metric_weight = None
+        self.bar_plot_s = None
+        
                              
     def extract(self, year):
 
@@ -208,11 +216,16 @@ class DiscountLunch(object):
         self.description_s = 'Students receiving reduced-price or free lunch (%)'
         self.explanatory_name = 'Reduced or free lunch'
         self.multiplier = 100
+        self.range_l = [0, 1]
         self.output_format_1_s = 'percent of students receiving reduced-price or free lunch'
         self.output_format_2_s = '{:0.0f}%'
         self.new_table_s = 'discount_lunch'
         self.orig_table_s_d = {year:'Demographic Factors' for year in range(2007, 2015)}
         self.allow_prediction = True
+        self.in_metric = False
+        self.metric_weight = None
+        self.bar_plot_s = None
+        
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -254,11 +267,16 @@ class Dropout(object):
         self.description_s = 'Dropout rate (%)'
         self.explanatory_name = 'Dropout rate'
         self.multiplier = 100
+        self.range_l = [0, 1]
         self.output_format_1_s = 'dropout rate'
         self.output_format_2_s = '{:0.1f}%'
         self.new_table_s = 'dropout'
         self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
         self.allow_prediction = True
+        self.in_metric = True
+        self.metric_weight = -1
+        self.bar_plot_s = 'Dropout rate (%)'
+        
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -417,11 +435,16 @@ class PopTwelfth(object):
         self.description_s = '12th grade population'
         self.explanatory_name = 'Population of 12th grade'
         self.multiplier = 1
+        self.range_l = [0, np.inf]
         self.output_format_1_s = '12th grade population'
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'pop_twelfth'
         self.orig_table_s_d = {year:'BEDS Day Enrollment' for year in range(2007, 2015)}
         self.allow_prediction = True
+        self.in_metric = False
+        self.metric_weight = None
+        self.bar_plot_s = None
+
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -460,6 +483,7 @@ class PostSecondary(object):
         self.description_s = 'Percentage of graduates attending college\nor other post-secondary education'
         self.explanatory_name = 'Post-secondary education'
         self.multiplier = 100
+        self.range_l = [0, 1]
         self.output_format_1_s = 'percentage of graduates attending college or other post-secondary education'
         self.output_format_2_s = '{:0.0f}%'
         self.new_table_s = 'post_secondary'
@@ -467,6 +491,10 @@ class PostSecondary(object):
         self.orig_table_s_d[2007] = 'High School Post-Graduation Plans of Graduates'
         self.orig_table_s_d[2008] = 'High School Post-Graduation Plans of Graduates'
         self.allow_prediction = True
+        self.in_metric = True
+        self.metric_weight = 1
+        self.bar_plot_s = 'College / post-secondary\nattendance rate (%)'
+
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -527,6 +555,7 @@ class RegentsPassRate(object):
         self.description_s = 'Percent passing Regents Exams\n(averaged over subjects)'
         self.explanatory_name = 'Regents Exams pass rate'
         self.multiplier = 100
+        self.range_l = [0, 1]
         self.output_format_1_s = 'percent of students passing Regents Exams (averaged over subjects)'
         self.output_format_2_s = '{:0.0f}%'
         self.new_table_s = 'regents_pass_rate'
@@ -542,6 +571,10 @@ class RegentsPassRate(object):
                           2013: 'Regents Examination Annual Results',
                           2014: 'Regents Examination Annual Results'}
         self.allow_prediction = True
+        self.in_metric = True
+        self.metric_weight = 1
+        self.bar_plot_s = 'Regents Exams pass rate (%)'
+
 
     def extract(self, cur, year):
         """ Returns an N-by-3 of the ENTITY_CD, SUBJECT, and pass rate """
@@ -640,11 +673,16 @@ class TeacherNumber(object):
         self.description_s = 'Number of teachers'
         self.explanatory_name = 'Number of teachers'
         self.multiplier = 1
+        self.range_l = [0, np.inf]
         self.output_format_1_s = 'number of teachers'
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'teacher_number'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
         self.allow_prediction = True
+        self.in_metric = False
+        self.metric_weight = None
+        self.bar_plot_s = None
+
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -683,11 +721,16 @@ class TenthClassSize(object):
         self.description_s = 'Size of 10th grade classes\n(averaged over English, math, science, and social studies)'
         self.explanatory_name = 'Average classroom size'
         self.multiplier = 1
+        self.range_l = [0, np.inf]
         self.output_format_1_s = 'average classroom size'
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'tenth_class_size'
         self.orig_table_s_d = {year:'Average Class Size' for year in range(2007, 2015)}
         self.allow_prediction = False
+        self.in_metric = True
+        self.metric_weight = -0.01
+        self.bar_plot_s = 'Avg. class size'
+
         
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
@@ -726,11 +769,15 @@ class TurnoverRate(object):
         self.description_s = 'Percentage of teacher turnover in a given year'
         self.explanatory_name = 'Turnover rate'
         self.multiplier = 100
+        self.range_l = [0, 1]
         self.output_format_1_s = 'yearly teacher turnover rate'
         self.output_format_2_s = '{:0.0f}%'
         self.new_table_s = 'turnover_rate'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
         self.allow_prediction = False
+        self.in_metric = True
+        self.metric_weight = -1
+        self.bar_plot_s = 'Yearly turnover rate (%)'
 
         
     def extract(self, cur, year):
