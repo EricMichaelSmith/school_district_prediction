@@ -16,8 +16,7 @@ import join_data
 @app.route('/index')
 @app.route('/input')
 def schools_input():
-  return render_template("input.html",
-                         dropdown_s_l = dropdown_s_l)
+  return render_template("input.html")
                          
                          
 
@@ -109,10 +108,10 @@ def schools_output():
                 prediction_1_d_l = query_prediction_scores(feature_s, ID=schools1[0]['school_id'])
                 past_2_d_l = query_past_scores(feature_s, ID=schools2[0]['school_id'])
                 prediction_2_d_l = query_prediction_scores(feature_s, ID=schools2[0]['school_id'])
-                if not np.any(np.isnan(np.array(past_1_d_l[0]['score_l']))) and \
-                    not np.any(np.isnan(np.array(prediction_1_d_l[0]['score_l']))) and \
-                    not np.any(np.isnan(np.array(past_2_d_l[0]['score_l']))) and \
-                    not np.any(np.isnan(np.array(prediction_2_d_l[0]['score_l']))):
+                if not any([x is None for x in past_1_d_l[0]['score_l']]) and \
+                    not any([x is None for x in prediction_1_d_l[0]['score_l']]) and \
+                    not any([x is None for x in past_2_d_l[0]['score_l']]) and \
+                    not any([x is None for x in prediction_2_d_l[0]['score_l']]):
                         past_1_d[feature_s] = past_1_d_l[0]['score_l']
                         prediction_1_d[feature_s] = prediction_1_d_l[0]['score_l']
                         past_2_d[feature_s] = past_2_d_l[0]['score_l']
@@ -124,6 +123,8 @@ def schools_output():
                         range_l_d[feature_s] = \
                             all_database_stats_d[feature_s]['range_l']
         features_to_plot_s_l = sorted([key for key in bar_plot_s_d.iterkeys()])
+        dropdown_s_l = sorted([all_database_stats_d[feature_s]['explanatory_name'] for \
+                               feature_s in features_to_plot_s_l])
         
         
         ## Calculate overall scores
@@ -314,10 +315,3 @@ def query_prediction_scores(feature_s, ID):
 db = mdb.connect(user="root", passwd=config_unsynced.pword_s,
                  host="localhost", db="joined", charset='utf8')
 all_database_stats_d = join_data.collect_database_stats()
-
-## Information for dropdown list
-dropdown_s_l = []
-for database_s in all_database_stats_d.iterkeys():
-    if all_database_stats_d[database_s]['allow_prediction']:
-        dropdown_s_l.append(all_database_stats_d[database_s]['explanatory_name'])
-dropdown_s_l = sorted(dropdown_s_l)

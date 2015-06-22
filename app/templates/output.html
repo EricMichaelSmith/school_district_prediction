@@ -94,6 +94,8 @@
 
   </div> <!-- /.container-->
 
+
+    {% if feature_s %}
     <div class="container">
       <div class="starter-template">
         <img src="/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"/>
@@ -106,6 +108,7 @@
 
 
      </div><!-- /.container -->
+     {% endif %}
 
 
     <!-- Bootstrap core JavaScript
