@@ -275,7 +275,7 @@ class Dropout(object):
         self.allow_prediction = True
         self.in_metric = True
         self.metric_weight = -1
-        self.bar_plot_s = 'Dropout rate (%)'
+        self.bar_plot_s = 'Dropout\nrate (%)'
         
         
     def extract(self, cur, year):
@@ -573,7 +573,7 @@ class RegentsPassRate(object):
         self.allow_prediction = True
         self.in_metric = True
         self.metric_weight = 1
-        self.bar_plot_s = 'Regents Exams pass rate (%)'
+        self.bar_plot_s = 'Regents Exams\npass rate (%)'
 
 
     def extract(self, cur, year):
@@ -729,7 +729,7 @@ class TenthClassSize(object):
         self.allow_prediction = False
         self.in_metric = True
         self.metric_weight = -0.01
-        self.bar_plot_s = 'Avg. class size'
+        self.bar_plot_s = 'Avg. class size\n'
 
         
     def extract(self, cur, year):
@@ -777,7 +777,7 @@ class TurnoverRate(object):
         self.allow_prediction = False
         self.in_metric = True
         self.metric_weight = -1
-        self.bar_plot_s = 'Yearly turnover rate (%)'
+        self.bar_plot_s = 'Yearly turnover\nrate (%)'
 
         
     def extract(self, cur, year):

@@ -73,8 +73,9 @@
           <label for="Name2"><font color="blue">School Name 2:</font></label>
           <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px">
           <br>
-          <div class="starter-template">
-            <img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"/>
+          <div>
+            <p>{{ bar_plot_message_s }}</p>
+            <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
           </div>
           <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
@@ -101,8 +102,8 @@
 
     {% if feature_s %}
     <div class="container">
-      <div class="starter-template">
-        <img src="/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"/>
+      <div>
+        <center><img src="/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"></center>
       </div>
       <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
 

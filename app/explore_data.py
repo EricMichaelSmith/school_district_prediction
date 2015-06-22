@@ -177,7 +177,7 @@ def plot_pairwise_correlations(change=True):
     heatmap_ax = fig.add_axes([0.43, 0.10, 0.55, 0.55])
     
     # Show image
-    color_t_t = ((1, 0, 0), (1, 1, 1), (0, 1, 0))
+    color_t_t = ((1, 0, 0), (1, 1, 1), (0, 0, 1))
     max_magnitude = 1.0
     colormap = make_colormap(color_t_t, (-max_magnitude, 0, max_magnitude))
     heatmap_ax.imshow(heat_map_a,

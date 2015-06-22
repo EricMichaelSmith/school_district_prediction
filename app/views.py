@@ -1,8 +1,9 @@
 from app import app
-from flask import make_response, render_template, request
+from flask import make_response, Markup, render_template, request
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pymysql as mdb
 import StringIO
 
@@ -36,14 +37,32 @@ def bar_plot():
     overall_score1 = float(request.args.get('score1'))
     overall_score2 = float(request.args.get('score2'))
 
-    fig = plt.Figure(figsize=(10,6))
+    fig_width = min([10, 2.5*(len(feature_s_l)+1)])
+    fig = plt.Figure(figsize=(fig_width, 4))
     fig.patch.set_facecolor('white')
+
+    axis_lr_margin = 0.04
+    axis_height = 0.75
+    axis_from_bottom = 0.12
+    num_plots = len(feature_s_l)+1
+    axis_width = (1 - (num_plots+1)*axis_lr_margin) / num_plots
     
     for i_feature, feature_s in enumerate(feature_s_l):
         school1_prediction = query_prediction_scores(feature_s, ID=ID1)
         school2_prediction = query_prediction_scores(feature_s, ID=ID2)
-        
-        axis = fig.add_subplot(1, len(feature_s_l)+1, i_feature+1)
+        with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
+            f.write(feature_s + '\n')
+            for val in school1_prediction[0]['score_l']:
+                f.write('{0:0.2f}\n'.format(val))
+            f.write('foo\n')
+            for val in school2_prediction[0]['score_l']:
+                f.write('{0:0.2f}\n'.format(val))
+                
+        plot_num = i_feature+1
+        axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
+                                axis_from_bottom,
+                                axis_width,
+                                axis_height])
         score1 = school1_prediction[0]['score_l'][-1] * \
             all_database_stats_d[feature_s]['multiplier']
         score2 = school2_prediction[0]['score_l'][-1] * \
@@ -51,13 +70,39 @@ def bar_plot():
         axis.bar(0, score1, 1, color='r')
         axis.bar(1, score2, 1, color='b')
         axis.set_xlim([-0.25, 2.25])
-        axis.set_xlabel(all_database_stats_d[feature_s]['bar_plot_s'])
-        
-    axis = fig.add_subplot(1, len(feature_s_l)+1, len(feature_s_l)+1)
+        axis.set_xticks([0.5, 1.5])
+        axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)
+        if all_database_stats_d[feature_s]['multiplier'] == 100:
+            axis.set_ylim([0, 100])
+        metric_weight_sign = float(all_database_stats_d[feature_s]['metric_weight']) / \
+            float(abs(all_database_stats_d[feature_s]['metric_weight']))
+        if score1 * metric_weight_sign > score2 * metric_weight_sign:
+            color_s = 'r'
+        elif score2 * metric_weight_sign > score1 * metric_weight_sign:
+            color_s = 'b'
+        else:
+            color_s = 'k'
+        axis.set_title(all_database_stats_d[feature_s]['bar_plot_s'], fontsize=12, 
+                       color=color_s)
+    
+    plot_num = num_plots
+    axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
+                            axis_from_bottom,
+                            axis_width,
+                            axis_height])
     axis.bar(0, overall_score1, 1, color='r')
     axis.bar(1, overall_score2, 1, color='b')
     axis.set_xlim([-0.25, 2.25])
-    axis.set_xlabel('Overall score', fontweight='bold')
+    axis.set_xticks([0.5, 1.5])
+    axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)   
+    axis.set_ylim([0, 100])     
+    if overall_score1 > overall_score2:
+        color_s = 'r'
+    elif overall_score2 > overall_score1:
+        color_s = 'b'
+    else:
+        color_s = 'k'
+    axis.set_title('Overall score', fontweight='bold', fontsize=12, color=color_s)
     
     canvas = FigureCanvas(fig)
     output = StringIO.StringIO()
@@ -136,19 +181,43 @@ def schools_output():
         raw_score2 = 0
         max_possible_score = 0
         for feature_s in features_to_plot_s_l:
-            if metric_weight_d[feature_s] > 0:
-                raw_score1 += past_1_d[feature_s][-1] * metric_weight_d[feature_s]
-                raw_score2 += past_2_d[feature_s][-1] * metric_weight_d[feature_s]
-                max_possible_score += range_l_d[feature_s][1] * metric_weight_d[feature_s]
+            if range_l_d[feature_s][1] == np.inf:
+                upper_bound = max(prediction_1_d[feature_s][-1],
+                                  prediction_2_d[feature_s][-1])
             else:
-                max_this_feature = -range_l_d[feature_s][1] * metric_weight_d[feature_s]
-                raw_score1 += past_1_d[feature_s][-1] * metric_weight_d[feature_s] \
+                upper_bound = range_l_d[feature_s][1]
+            if metric_weight_d[feature_s] > 0:
+                raw_score1 += prediction_1_d[feature_s][-1] * metric_weight_d[feature_s]
+                raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s]
+                max_possible_score += upper_bound * metric_weight_d[feature_s]
+            else:
+                max_this_feature = -upper_bound * metric_weight_d[feature_s]
+                raw_score1 += prediction_1_d[feature_s][-1] * metric_weight_d[feature_s] \
                     + max_this_feature
-                raw_score2 += past_2_d[feature_s][-1] * metric_weight_d[feature_s] \
+                raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s] \
                     + max_this_feature
                 max_possible_score += max_this_feature
+            with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
+                f.write('{2} {0:0.2f} {1:0.2f}\n'.format(raw_score1, raw_score2, feature_s))
         norm_score1 = raw_score1 / max_possible_score * 100
         norm_score2 = raw_score2 / max_possible_score * 100
+        with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
+                f.write('{0:0.2f} {1:0.2f}\n'.format(raw_score1, raw_score2))
+        bar_plot_message_s = 'Prediction: in {0:d}, <font color="#000000">{1}</font> will perform better on statistics colored in <font color="#ff0000">red</font> below, and <font color="#000000">{2}</font> will perform better on statistics colored in <font color="#0000ff">blue</font>.'.format(config.prediction_year_l[-1], schools1[0]['name'], schools2[0]['name'])
+        if norm_score1 != norm_score2:
+            second_sentence_s = ' <b>Overall, {1} will perform better than {3} with a score of <font color="{0}">{4:0.0f}/100</font> vs. <font color="{2}">{5:0.0f}/100</font>.</b>'
+            if norm_score1 > norm_score2:
+                second_sentence_s = second_sentence_s.format('#ff0000', schools1[0]['name'],
+                                                             '#0000ff', schools2[0]['name'],
+                                                             norm_score1, norm_score2)
+            else:
+                second_sentence_s = second_sentence_s.format('#0000ff', schools2[0]['name'],
+                                                            '#ff0000', schools1[0]['name'],
+                                                            norm_score2, norm_score1)
+        else:
+            second_sentence_s = ' <b> Overall, both schools will perform equally well with a score of {0:0.0f}/100.</b>'.format(norm_score1)
+        bar_plot_message_s += second_sentence_s
+        bar_plot_message_s = Markup(bar_plot_message_s)
                 
     
         ## Information for time trace plot and for output text
@@ -176,14 +245,14 @@ def schools_output():
                 output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
                     feature_d['output_format_2_s'],
                     num_years_prediction,
-                    year_s, Name1)
+                    year_s, schools1_past[0]['name'])
                 output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
                 output_message_color_s = 'red'
             elif school1_predicted_difference < 0:
                 output_message_s = "Prediction: The {0} of {4} will be {1} higher in {2:d} {3}.".format(feature_d['output_format_1_s'],
                     feature_d['output_format_2_s'],
                     num_years_prediction,
-                    year_s, Name2)
+                    year_s, schools2_past[0]['name'])
                 output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
                 output_message_color_s = 'blue'
             else:
@@ -208,6 +277,7 @@ def schools_output():
                                Name2 = Name2,
                                ID1 = schools1[0]['school_id'],
                                ID2 = schools2[0]['school_id'],
+                               bar_plot_message_s = bar_plot_message_s,
                                feature_list_s = feature_list_s,
                                score1 = norm_score1,
                                score2 = norm_score2,
