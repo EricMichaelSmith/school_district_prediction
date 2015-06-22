@@ -59,8 +59,10 @@
 
     <div class="starter-template">
         <h2><center>Schoolstradamus</center></h2>
-      <h3><center>Forecasting a school's future performance</center></h3>
-        <p>Enter two high schools in the State of New York, and this website will predict the quality of the school on various metrics three years from now.</p>
+        <h3><center>Forecasting a school's future performance</center></h3>
+    </div>
+    <div class="container">
+      <p>Enter two high schools in the State of New York, and this website will predict the quality of the school on various metrics three years from now.</p>
     </div>
 
     <div class = "container">
@@ -74,8 +76,9 @@
           <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px">
           <br>
           <div>
-            <p>{{ bar_plot_message_s }}</p>
-            <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
+          <br>
+          <p>{{ bar_plot_message_s }}</p>
+          <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
           </div>
           <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
@@ -102,10 +105,11 @@
 
     {% if feature_s %}
     <div class="container">
+      <br>
+      <p><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
       <div>
         <center><img src="/plot?ID1={{ schools1_past[0]['school_id'] }}&ID2={{ schools2_past[0]['school_id'] }}&Feature={{ feature_s }}"></center>
       </div>
-      <p class="lead"><font color="{{ output_message_color_s }}">{{ output_message_s }}</font></p>
 
 
       <script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>

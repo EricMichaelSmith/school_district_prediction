@@ -41,7 +41,7 @@ def bar_plot():
     fig = plt.Figure(figsize=(fig_width, 4))
     fig.patch.set_facecolor('white')
 
-    axis_lr_margin = 0.04
+    axis_lr_margin = 0.05*10/fig_width
     axis_height = 0.75
     axis_from_bottom = 0.12
     num_plots = len(feature_s_l)+1
@@ -50,13 +50,6 @@ def bar_plot():
     for i_feature, feature_s in enumerate(feature_s_l):
         school1_prediction = query_prediction_scores(feature_s, ID=ID1)
         school2_prediction = query_prediction_scores(feature_s, ID=ID2)
-        with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
-            f.write(feature_s + '\n')
-            for val in school1_prediction[0]['score_l']:
-                f.write('{0:0.2f}\n'.format(val))
-            f.write('foo\n')
-            for val in school2_prediction[0]['score_l']:
-                f.write('{0:0.2f}\n'.format(val))
                 
         plot_num = i_feature+1
         axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
@@ -197,12 +190,8 @@ def schools_output():
                 raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s] \
                     + max_this_feature
                 max_possible_score += max_this_feature
-            with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
-                f.write('{2} {0:0.2f} {1:0.2f}\n'.format(raw_score1, raw_score2, feature_s))
         norm_score1 = raw_score1 / max_possible_score * 100
         norm_score2 = raw_score2 / max_possible_score * 100
-        with open(os.path.join(config.plot_path, 'foo'), 'a') as f:
-                f.write('{0:0.2f} {1:0.2f}\n'.format(raw_score1, raw_score2))
         bar_plot_message_s = 'Prediction: in {0:d}, <font color="#000000">{1}</font> will perform better on statistics colored in <font color="#ff0000">red</font> below, and <font color="#000000">{2}</font> will perform better on statistics colored in <font color="#0000ff">blue</font>.'.format(config.prediction_year_l[-1], schools1[0]['name'], schools2[0]['name'])
         if norm_score1 != norm_score2:
             second_sentence_s = ' <b>Overall, {1} will perform better than {3} with a score of <font color="{0}">{4:0.0f}/100</font> vs. <font color="{2}">{5:0.0f}/100</font>.</b>'
