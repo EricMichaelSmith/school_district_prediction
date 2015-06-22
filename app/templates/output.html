@@ -73,6 +73,10 @@
           <label for="Name2"><font color="blue">School Name 2:</font></label>
           <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px">
           <br>
+          <div class="starter-template">
+            <img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"/>
+          </div>
+          <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
           <select id="Feature" name="Feature" class="input-xlarge">
             {% for dropdown_s in dropdown_s_l %}

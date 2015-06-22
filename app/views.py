@@ -33,8 +33,8 @@ def bar_plot():
             feature_s_l.append(request.args.get(arg_s))
         else:
             loop = False
-    overall_score1 = request.args.get('score1')
-    overall_score2 = request.args.get('score2')
+    overall_score1 = float(request.args.get('score1'))
+    overall_score2 = float(request.args.get('score2'))
 
     fig = plt.Figure(figsize=(10,6))
     fig.patch.set_facecolor('white')
@@ -43,20 +43,20 @@ def bar_plot():
         school1_prediction = query_prediction_scores(feature_s, ID=ID1)
         school2_prediction = query_prediction_scores(feature_s, ID=ID2)
         
-        axis = fig.add_subplot(1, len(feature_s)+1, i_feature+1)
+        axis = fig.add_subplot(1, len(feature_s_l)+1, i_feature+1)
         score1 = school1_prediction[0]['score_l'][-1] * \
             all_database_stats_d[feature_s]['multiplier']
         score2 = school2_prediction[0]['score_l'][-1] * \
             all_database_stats_d[feature_s]['multiplier']
-        axis.bar(0, score1, 1, 'r')
-        axis.bar(1, score2, 1, 'b')
-        axis.set_xlim([-0.25, 1.25])
+        axis.bar(0, score1, 1, color='r')
+        axis.bar(1, score2, 1, color='b')
+        axis.set_xlim([-0.25, 2.25])
         axis.set_xlabel(all_database_stats_d[feature_s]['bar_plot_s'])
         
-    axis = fig.add_subplot(1, len(feature_s)+1, len(feature_s)+1)
-    axis.bar(0, overall_score1, 1, 'r')
-    axis.bar(1, overall_score2, 1, 'b')
-    axis.set_xlim([-0.25, 1.25])
+    axis = fig.add_subplot(1, len(feature_s_l)+1, len(feature_s_l)+1)
+    axis.bar(0, overall_score1, 1, color='r')
+    axis.bar(1, overall_score2, 1, color='b')
+    axis.set_xlim([-0.25, 2.25])
     axis.set_xlabel('Overall score', fontweight='bold')
     
     canvas = FigureCanvas(fig)
@@ -123,6 +123,10 @@ def schools_output():
                         range_l_d[feature_s] = \
                             all_database_stats_d[feature_s]['range_l']
         features_to_plot_s_l = sorted([key for key in bar_plot_s_d.iterkeys()])
+        feature_list_s = ''
+        for i_feature, feature_s in enumerate(features_to_plot_s_l):
+            feature_list_s += 'feature{0:d}={1}&'.format(i_feature+1, feature_s)
+        feature_list_s = feature_list_s[:-1]
         dropdown_s_l = sorted([all_database_stats_d[feature_s]['explanatory_name'] for \
                                feature_s in features_to_plot_s_l])
         
@@ -202,7 +206,9 @@ def schools_output():
                                dropdown_s_l = dropdown_s_l,
                                Name1 = Name1,
                                Name2 = Name2,
-                               features_to_plot_s_l = features_to_plot_s_l,
+                               ID1 = schools1[0]['school_id'],
+                               ID2 = schools2[0]['school_id'],
+                               feature_list_s = feature_list_s,
                                score1 = norm_score1,
                                score2 = norm_score2,
                                default_dropdown_s = default_dropdown_s,
