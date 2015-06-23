@@ -17,7 +17,7 @@ import join_data
 @app.route('/index')
 @app.route('/input')
 def schools_input():
-  return render_template("input.html")
+  return render_template("output.html")
                          
                          
 

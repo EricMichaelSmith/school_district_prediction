@@ -70,15 +70,23 @@
       <form action="/output" method="GET">
         <div class="form-group">
           <label for="Name1"><font color="red">School Name 1:</font></label>
+          {% if Name1 %}
           <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:420px">
+          {% else %}
+          <input type="text" id="Name1" name='Name1' placeholder="e.g. Long Island City High School" style="width:420px">
+          {% endif %}
           <br>
           <label for="Name2"><font color="blue">School Name 2:</font></label>
+          {% if Name2 %}
           <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px">
+          {% else %}
+          <input type="text" id="Name2" name='Name2' placeholder="e.g. Queens Vocational And Technical High School" style="width:420px">
+          {% endif %}
           <br>
+          {% if bar_plot_message_s %}
           <div>
-          <br>
-          <p>{{ bar_plot_message_s }}</p>
-          <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
+            <p>{{ bar_plot_message_s }}</p>
+            <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
           </div>
           <br>
           <label class="control-label" for="selectbasic">Show prediction for statistic:</label>
@@ -91,6 +99,7 @@
             {% endif %}
             {% endfor %}
           </select>
+          {% endif %}
         </div>
         <div>
           <button type="submit" class="btn btn-default btn-lg">Make prediction</button>
