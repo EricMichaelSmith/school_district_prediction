@@ -767,7 +767,7 @@ class TurnoverRate(object):
     
     def __init__(self):
         self.description_s = 'Percentage of teacher turnover in a given year'
-        self.explanatory_name = 'Turnover rate'
+        self.explanatory_name = 'Teacher turnover rate'
         self.multiplier = 100
         self.range_l = [0, 1]
         self.output_format_1_s = 'yearly teacher turnover rate'
@@ -777,7 +777,7 @@ class TurnoverRate(object):
         self.allow_prediction = False
         self.in_metric = True
         self.metric_weight = -1
-        self.bar_plot_s = 'Yearly turnover\nrate (%)'
+        self.bar_plot_s = 'Yearly teacher\nturnover rate (%)'
 
         
     def extract(self, cur, year):
