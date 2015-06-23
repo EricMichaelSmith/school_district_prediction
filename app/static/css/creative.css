@@ -53,13 +53,13 @@ p {
     line-height: 1.5;
 }
 
-ul {
+.ul-body {
     margin-left: 80px;
     margin-right: 120px;
     margin-bottom: 20px;
 }
 
-li{
+.li-body{
     margin: 10px 0;
 }
 
