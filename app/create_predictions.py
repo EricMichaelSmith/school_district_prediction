@@ -519,4 +519,4 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
 
     
 if __name__ == '__main__':
-    main(aux_features=False, positive_control=False, regression_algorithm_s='linear_regression', save_data=False)
+    main(aux_features=True, positive_control=False, regression_algorithm_s='elastic_cv', save_data=False)
