@@ -29,6 +29,26 @@ def main():
     plot_cross_correlations_wrapper()
     plot_pairwise_correlations(change=True)
     plot_pairwise_correlations(change=False)
+    make_change_scatter_plot('dropout', 'teacher_number')
+    make_change_scatter_plot('budget', 'discount_lunch')
+    
+    
+
+def make_change_scatter_plot(feature1_s, feature2_s):
+    
+    feature1_a = 2 * (data_a_d[feature1_s][:, -1] - data_a_d[feature1_s][:, 0]) / \
+                    (data_a_d[feature1_s][:, -1] + data_a_d[feature1_s][:, 0])
+    feature2_a = 2 * (data_a_d[feature2_s][:, -1] - data_a_d[feature2_s][:, 0]) / \
+                    (data_a_d[feature2_s][:, -1] + data_a_d[feature2_s][:, 0])
+    all_database_stats_d = join_data.collect_database_stats()
+    
+    fig = plt.figure(figsize=(6,6))
+    ax = fig.add_axes(0.1, 0.1, 0.8, 0.8)
+    ax = make_scatter_plot(ax, feature1_a, feature2_a, 'k', plot_regression_b=True,
+                           print_stats_b=True)
+    ax.set_xlabel(all_database_stats_d[feature1_s]['description_s'])
+    ax.set_ylabel(all_database_stats_d[feature2_s]['description_s'])
+    plt.savefig(os.path.join(save_path, 'change_scatter_plot.png'))
     
     
     
@@ -65,6 +85,37 @@ def make_colormap(color_t_t, color_value_t):
     colormap = LinearSegmentedColormap('ShapePlotColorMap', color_d)
     
     return colormap
+    
+    
+def make_scatter_plot(ax, x_a, y_a, color_t, plot_axes_at_zero_b=False,
+                                               plot_regression_b=False,
+                                               print_stats_b=False):
+    """
+    Creates a scatter plot.
+    """
+    
+    # Plot all data
+    ax.scatter(x_a, y_a,
+                    c=color_t,
+                    edgecolors='none')
+                                        
+    # Plot x=0 and y=0 lines
+    if plot_axes_at_zero_b:
+        ax.axhline(y=0, color='k')
+        ax.axvline(x=0, color='k')
+    
+    # Plot regression line (one set of points only)
+    if plot_regression_b:
+        plot_regression(ax, x_a, y_a)
+        
+    if print_stats_b:
+        slope, intercept, r_value, p_value, std_err = \
+            stats.linregress(np.array(x_a.tolist()),
+                             np.array(y_a.tolist()))
+        ax.set_title('r-value = %0.2f, p-value = %0.3g' % \
+                     (r_value, p_value))
+                     
+    return ax
     
     
 
@@ -204,6 +255,30 @@ def plot_pairwise_correlations(change=True):
                   color_bar_s)
     
     plt.savefig(os.path.join(save_path, 'pearsons_r_heatmap' + suffix_s + '.png'))
+    
+    
+    
+def plot_regression(ax, x_a, y_a):
+    """
+    Plots a regression line on the current plot. The stretching of the
+    regression line and resetting of the axis limits is kind of a hack.
+    """    
+    
+    # Find correct axis limits
+    axis_limits_t = ax.axis()
+    
+    # Calculate and plot regression
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x_a, y_a)
+    plt.plot([2*axis_limits_t[0], 2*axis_limits_t[1]],
+             [slope*2*axis_limits_t[0]+intercept,
+              slope*2*axis_limits_t[1]+intercept],
+             'r')
+    
+    # Reset axis limits
+    ax.set_xlim(axis_limits_t[0], axis_limits_t[1])
+    ax.set_ylim(axis_limits_t[2], axis_limits_t[3])
+    
+    return ax
     
     
 

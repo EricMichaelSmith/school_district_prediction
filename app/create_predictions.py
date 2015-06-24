@@ -13,7 +13,7 @@ import numpy as np
 import os
 import pandas as pd
 from sklearn import cross_validation
-#from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 #from sklearn.gaussian_process import GaussianProcess
 from sklearn.linear_model import ElasticNetCV, LinearRegression
 from sklearn.preprocessing import Imputer
@@ -80,7 +80,7 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1, positive_control=False):
+    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1, positive_control=False, regression_algorithm_s = 'elastic_net'):
         """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the fitting, which is ideal for training the algorithm. """
 
         # Apply optional parameters
@@ -116,15 +116,19 @@ class AutoRegression(object):
         estimatorY = Imputer(axis=0)
         Y = estimatorY.fit_transform(Y.reshape(-1, 1)).reshape(-1)
 
-        l1_ratio_l = [.1, .5, .7, .9, .95, .99, 1]
-        alpha_l = np.logspace(-15, 5, num=11).tolist()      
-        max_iter = 1e5
-        # It's too slow when I make it high, so I'll keep it low for now
-        model = ElasticNetCV(l1_ratio=l1_ratio_l, alphas=alpha_l, max_iter=max_iter,
-                             fit_intercept=True, normalize=True)
-#        model = LinearRegression(fit_intercept=True, normalize=True)
-#        model = RandomForestRegressor(max_features='auto')
-#        model = GradientBoostingRegressor(max_features='sqrt')
+        if regression_algorithm_s == 'elastic_net':
+            l1_ratio_l = [.1, .5, .7, .9, .95, .99, 1]
+            alpha_l = np.logspace(-15, 5, num=11).tolist()      
+            max_iter = 1e5
+            # It's too slow when I make it high, so I'll keep it low for now
+            model = ElasticNetCV(l1_ratio=l1_ratio_l, alphas=alpha_l, max_iter=max_iter,
+                                 fit_intercept=True, normalize=True)
+        elif regression_algorithm_s == 'gradient_boosting':
+            model = GradientBoostingRegressor(max_features='sqrt')   
+        elif regression_algorithm_s == 'linear_regression':
+            model = LinearRegression(fit_intercept=True, normalize=True)
+        elif regression_algorithm_s == 'random_forest':
+            model = RandomForestRegressor(max_features='auto')
         model.fit(X, Y)
 #        print('Lag of {0:d}:'.format(lag))
 #        print('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
@@ -134,7 +138,7 @@ class AutoRegression(object):
         return model
         
     def predict(self, raw_array, results, aux_data_a_d=None, diff=False,
-                holdout_col=0, lag=1, positive_control=False):
+                holdout_col=0, lag=1, positive_control=False, **kwargs):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
         
         if positive_control:
@@ -384,7 +388,7 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
     
 
 def predict_a_feature(input_data_a_d, primary_feature_s,
-                      aux_features=True,
+                      aux_features=True, save_data=False,
                       **kwargs):
     
     print('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
@@ -409,8 +413,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     all_results_d = {}
     
     # Run autoregression with different lags on raw test scores
-#    lag_l = range(1, 5)
-    lag_l = [4]
+    lag_l = range(1, 5)
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
         print(model_s + ':')
@@ -419,15 +422,15 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                                                  diff=False, lag=lag,
                                                  **kwargs)
     
-#    # Run autogression with different lags on diff of test scores w.r.t. year
-#    lag_l = range(1, 4)
-#    for lag in lag_l:
-#        model_s = 'diff_lag{:d}'.format(lag)
-#        print(model_s + ':')
-#        all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
-#                                                 aux_data_a_d=data_a_d,
-#                                                 diff=True, lag=lag,
-#                                                 **kwargs)
+    # Run autogression with different lags on diff of test scores w.r.t. year
+    lag_l = range(1, 4)
+    for lag in lag_l:
+        model_s = 'diff_lag{:d}'.format(lag)
+        print(model_s + ':')
+        all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
+                                                 aux_data_a_d=data_a_d,
+                                                 diff=True, lag=lag,
+                                                 **kwargs)
 
     # Run control: prediction is same as mean over years in training set
     model_s = 'z_mean_over_years_score_control'
@@ -501,18 +504,19 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     
     
     ## Save data to the SQL database
-    model_to_save_s = 'raw_lag4'
-    new_column_s_l = ['ENTITY_CD'] + \
-        ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
-         for year in config.prediction_year_l]
-    prediction_a = np.concatenate((index_a.reshape(-1, 1),
-                                   all_results_d[model_to_save_s]['prediction_a']),
-                                  axis=1)
-    prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
-    utilities.write_to_sql_table(prediction_df,
-                                 '{0}_prediction'.format(primary_feature_s), 'joined')    
+    if save_data:
+        model_to_save_s = 'raw_lag4'
+        new_column_s_l = ['ENTITY_CD'] + \
+            ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
+             for year in config.prediction_year_l]
+        prediction_a = np.concatenate((index_a.reshape(-1, 1),
+                                       all_results_d[model_to_save_s]['prediction_a']),
+                                      axis=1)
+        prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
+        utilities.write_to_sql_table(prediction_df,
+                                     '{0}_prediction'.format(primary_feature_s), 'joined')    
     
 
     
 if __name__ == '__main__':
-    main(aux_features=True, positive_control=False)
+    main(aux_features=False, positive_control=False, regression_algorithm_s='linear_regression', save_data=False)
