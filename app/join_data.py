@@ -61,7 +61,6 @@ def collect_database_stats():
         d['output_format_2_s'] = instance.output_format_2_s
         d['new_table_s'] = instance.new_table_s
         d['orig_table_s_d'] = instance.orig_table_s_d
-        d['allow_prediction'] = instance.allow_prediction
         d['in_metric'] = instance.in_metric
         d['metric_weight'] = instance.metric_weight
         d['bar_plot_s'] = instance.bar_plot_s
@@ -187,7 +186,6 @@ class Budget(object):
         self.orig_table_s_d[2011] = 'NYSDOB_Enacted_SchoolAid__2011'
         self.column_s = {year:'{0:d}-{1:02.0f}'.format(year-1, year-2000)
                          for year in range(2007, 2015)}
-        self.allow_prediction = True
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
@@ -221,7 +219,6 @@ class DiscountLunch(object):
         self.output_format_2_s = '{:0.0f}%'
         self.new_table_s = 'discount_lunch'
         self.orig_table_s_d = {year:'Demographic Factors' for year in range(2007, 2015)}
-        self.allow_prediction = True
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
@@ -249,53 +246,6 @@ WHERE PER_FREE_LUNCH = 's' OR PER_REDUCED_LUNCH = 's';"""
 SET {1}_{0:d} = (PER_FREE_LUNCH + PER_REDUCED_LUNCH) / 100;"""
         cur.execute(command_s.format(year, self.new_table_s))
             
-        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
-        cur.execute(command_s.format(year))
-        command_s = """CREATE TABLE temp{0:d}_final
-SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
-WHERE YEAR = {0:d};"""
-        cur.execute(command_s.format(year, self.new_table_s))
-        command_s = """ALTER TABLE temp{0:d}_final
-ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
-        cur.execute(command_s.format(year))
-        
-        
-class Dropout(object):
-    """ Fraction of students who dropped out of school """
-    
-    def __init__(self):
-        self.description_s = 'Dropout rate (%)'
-        self.explanatory_name = 'Dropout rate'
-        self.multiplier = 100
-        self.range_l = [0, 1]
-        self.output_format_1_s = 'dropout rate'
-        self.output_format_2_s = '{:0.1f}%'
-        self.new_table_s = 'dropout'
-        self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
-        self.allow_prediction = True
-        self.in_metric = True
-        self.metric_weight = -1
-        self.bar_plot_s = 'Dropout\nrate (%)'
-        
-        
-    def extract(self, cur, year):
-        """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
-        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
-        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
-        cur.execute(command_s.format(year))
-        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
-WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education' AND PER_DROPOUT != 's';"""
-        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
-        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
-        cur.execute(command_s.format(year))
-        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
-        cur.execute(command_s.format(year, self.new_table_s))
-        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = PER_DROPOUT / 100;"""
-        cur.execute(command_s.format(year, self.new_table_s))
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d}_final
@@ -440,7 +390,6 @@ class PopTwelfth(object):
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'pop_twelfth'
         self.orig_table_s_d = {year:'BEDS Day Enrollment' for year in range(2007, 2015)}
-        self.allow_prediction = True
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
@@ -490,7 +439,6 @@ class PostSecondary(object):
         self.orig_table_s_d = {year:'High School Post-Graduation Plans of Completers' for year in range(2009, 2015)}
         self.orig_table_s_d[2007] = 'High School Post-Graduation Plans of Graduates'
         self.orig_table_s_d[2008] = 'High School Post-Graduation Plans of Graduates'
-        self.allow_prediction = True
         self.in_metric = True
         self.metric_weight = 1
         self.bar_plot_s = 'College / post-secondary\nattendance rate (%)'
@@ -570,7 +518,6 @@ class RegentsPassRate(object):
                           2012: 'Regents Examination Annual Results',
                           2013: 'Regents Examination Annual Results',
                           2014: 'Regents Examination Annual Results'}
-        self.allow_prediction = True
         self.in_metric = True
         self.metric_weight = 1
         self.bar_plot_s = 'Regents Exams\npass rate (%)'
@@ -666,6 +613,53 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         
         
         
+class StudentRetentionRate(object):
+    """ Fraction of students who did not drop out out of school """
+    
+    def __init__(self):
+        self.description_s = 'Student retention rate (%)'
+        self.explanatory_name = 'Student retention rate'
+        self.multiplier = 100
+        self.range_l = [0, 1]
+        self.output_format_1_s = 'student retention rate'
+        self.output_format_2_s = '{:0.0f}%'
+        self.new_table_s = 'student_retention_rate'
+        self.orig_table_s_d = {year:'High School Noncompleters' for year in range(2007, 2015)}
+        self.in_metric = True
+        self.metric_weight = 1
+        self.bar_plot_s = 'Student retention\nrate (%)'
+        
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
+WHERE YEAR = {0:d} AND SUBGROUP_NAME = 'General Education' AND PER_DROPOUT != 's';"""
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d} SET {1}_{0:d} = 1 - (PER_DROPOUT / 100);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
 class TeacherNumber(object):
     """ Number of teachers """
     
@@ -678,7 +672,6 @@ class TeacherNumber(object):
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'teacher_number'
         self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
-        self.allow_prediction = True
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
@@ -714,6 +707,57 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         
         
         
+class TeacherRetentionRate(object):
+    """ Retention rate of all teachers """
+    
+    def __init__(self):
+        self.description_s = 'Teacher retention rate (%)'
+        self.explanatory_name = 'Teacher retention rate'
+        self.multiplier = 100
+        self.range_l = [0, 1]
+        self.output_format_1_s = 'teacher retention rate'
+        self.output_format_2_s = '{:0.0f}%'
+        self.new_table_s = 'teacher_retention_rate'
+        self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
+        self.in_metric = True
+        self.metric_weight = 1
+        self.bar_plot_s = 'Teacher retention\nrate (%)'
+
+        
+    def extract(self, cur, year):
+        """ Returns an N-by-2 of the ENTITY_CD and value """
+        
+        assert(year >= 2007)        
+        
+        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
+        
+        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
+        cur.execute(command_s.format(year))
+        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
+        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
+        command_s = """DELETE FROM temp{0:d}
+WHERE PER_TURN_ALL = 's';"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
+        cur.execute(command_s.format(year))
+        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """UPDATE temp{0:d}
+SET {1}_{0:d} = 1 - (PER_TURN_ALL / 100);"""
+        cur.execute(command_s.format(year, self.new_table_s))
+            
+        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
+        cur.execute(command_s.format(year))
+        command_s = """CREATE TABLE temp{0:d}_final
+SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
+WHERE YEAR = {0:d};"""
+        cur.execute(command_s.format(year, self.new_table_s))
+        command_s = """ALTER TABLE temp{0:d}_final
+ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
+        cur.execute(command_s.format(year))
+        
+        
+        
 class TenthClassSize(object):
     """ Mean class size of 10-grade English, math, science, and social studies """
     
@@ -726,7 +770,6 @@ class TenthClassSize(object):
         self.output_format_2_s = '{:0.0f}'
         self.new_table_s = 'tenth_class_size'
         self.orig_table_s_d = {year:'Average Class Size' for year in range(2007, 2015)}
-        self.allow_prediction = False
         self.in_metric = True
         self.metric_weight = -0.01
         self.bar_plot_s = 'Avg. class size\n'
@@ -761,67 +804,15 @@ ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
         
         
-        
-class TurnoverRate(object):
-    """ Turnover rate of all teachers """
-    
-    def __init__(self):
-        self.description_s = 'Percentage of teacher turnover in a given year'
-        self.explanatory_name = 'Teacher turnover rate'
-        self.multiplier = 100
-        self.range_l = [0, 1]
-        self.output_format_1_s = 'yearly teacher turnover rate'
-        self.output_format_2_s = '{:0.0f}%'
-        self.new_table_s = 'turnover_rate'
-        self.orig_table_s_d = {year:'Staff' for year in range(2007, 2015)}
-        self.allow_prediction = False
-        self.in_metric = True
-        self.metric_weight = -1
-        self.bar_plot_s = 'Yearly teacher\nturnover rate (%)'
-
-        
-    def extract(self, cur, year):
-        """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
-        print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
-        command_s = 'DROP TABLE IF EXISTS temp{0:d};'
-        cur.execute(command_s.format(year))
-        command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
-        cur.execute(command_s.format(year, self.orig_table_s_d[year]))
-        command_s = """DELETE FROM temp{0:d}
-WHERE PER_TURN_ALL = 's';"""
-        cur.execute(command_s.format(year))
-        command_s = """ALTER TABLE temp{0:d} CHANGE ENTITY_CD ENTITY_CD_{0:d} CHAR(12);"""
-        cur.execute(command_s.format(year))
-        command_s = """ALTER TABLE temp{0:d} ADD {1}_{0:d} FLOAT(12);"""
-        cur.execute(command_s.format(year, self.new_table_s))
-        command_s = """UPDATE temp{0:d}
-SET {1}_{0:d} = PER_TURN_ALL / 100;"""
-        cur.execute(command_s.format(year, self.new_table_s))
-            
-        command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
-        cur.execute(command_s.format(year))
-        command_s = """CREATE TABLE temp{0:d}_final
-SELECT ENTITY_CD_{0:d}, {1}_{0:d} FROM temp{0:d}
-WHERE YEAR = {0:d};"""
-        cur.execute(command_s.format(year, self.new_table_s))
-        command_s = """ALTER TABLE temp{0:d}_final
-ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
-        cur.execute(command_s.format(year))
-        
-        
 
 Database_l = [DiscountLunch,
-              Dropout,
               PopTwelfth,
               PostSecondary,
               RegentsPassRate,
+              StudentRetentionRate,
               TeacherNumber,
-              TenthClassSize,
-              TurnoverRate]
+              TeacherRetentionRate,
+              TenthClassSize]
 DistrictDatabase_l = [Budget]
 # Features removed: EighthELAScore, EighthMathScore, EighthScienceScore
         

@@ -80,7 +80,7 @@ class AutoRegression(object):
     def __init__(self):
         pass
 
-    def fit(self, raw_array, aux_data_a_d=None, diff=False, holdout_col=0, lag=1, positive_control=False, regression_algorithm_s = 'elastic_net'):
+    def fit(self, raw_array, aux_data_a_d=None, diff=False, feature_s_l=[], holdout_col=0, lag=1, positive_control=False, regression_algorithm_s = 'elastic_net'):
         """ Performs an auto-regression of a given lag on the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the fitting, which is ideal for training the algorithm. """
 
         # Apply optional parameters
@@ -100,7 +100,7 @@ class AutoRegression(object):
         if positive_control:
             X = np.concatenate((X, array[:, lag:].reshape(-1, 1)), axis=1)                
         if aux_data_a_d:
-            for feature_s in aux_data_a_d.iterkeys():
+            for feature_s in feature_s_l:
                 if holdout_col > 0:
                     raw_array = aux_data_a_d[feature_s][:, :-holdout_col]
                 else:
@@ -130,10 +130,17 @@ class AutoRegression(object):
         elif regression_algorithm_s == 'random_forest':
             model = RandomForestRegressor(max_features='auto')
         model.fit(X, Y)
-#        print('Lag of {0:d}:'.format(lag))
-#        print('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
-#              (model.score(X, Y), model.l1_ratio_, model.alpha_))
-#        print(model.coef_)
+        with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+            f.write('Lag of {0:d}:\n'.format(lag))
+#            f.write('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
+#                  (model.score(X, Y), model.l1_ratio_, model.alpha_))
+            coeff_t = model.coef_
+            assert(not positive_control) # The coefficients won't currently line up
+            for i_lag in range(lag):
+                f.write('\ti_lag = {0:d}: {1:0.2g}\n'.format(lag-i_lag, coeff_t[i_lag]))
+            for i_feature, feature_s in enumerate(feature_s_l):
+                for i_lag in range(lag):
+                    f.write('\t{0}:\n\t\ti_lag = {1:d}: {2:0.2g}\n'.format(feature_s, lag-i_lag, coeff_t[lag*(i_feature+1) + i_lag]))
         
         return model
         
@@ -267,6 +274,8 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
     ## Training set: all years before the most recent
     
     # Fit on all years before the most recent
+    with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+        f.write('(fit on all years but last)\n')
     results_d['result_object'] = instance.fit(array, holdout_col=1,
                                               aux_data_a_d=aux_data_a_d,
                                               **kwargs)
@@ -324,6 +333,8 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
         
         # Train model
         instance = Class()
+        with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+            f.write('(10-fold CV fits)\n')
         result = instance.fit(array[train_index, :],
                               holdout_col=0,
                               aux_data_a_d=aux_train_a_d,
@@ -356,6 +367,8 @@ def fit_and_predict(array, Class, aux_data_a_d=None, **kwargs):
     ## Validating based on RMSE of prediction 3 years out
     
     # Fit on all years before the most recent 3
+    with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+        f.write('(fit on all years but last 3)\n')
     instance = Class()
     result = instance.fit(array, holdout_col=3, 
                           aux_data_a_d=aux_data_a_d,
@@ -392,6 +405,8 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                       **kwargs):
     
     print('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
+    with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+        f.write('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
     
     data_a_d = input_data_a_d.copy()
     index_a = data_a_d[primary_feature_s][:, 0]
@@ -405,8 +420,10 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     ## Split data
     main_data_a = data_a_d[primary_feature_s]
     data_a_d.pop(primary_feature_s)
+    feature_s_l = sorted(data_a_d.keys())
     if not aux_features:
         data_a_d = {}
+        feature_s_l = []
     
     
     ## Run regression models, validate and predict future scores, and run controls    
@@ -419,7 +436,9 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
         print(model_s + ':')
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
-                                                 diff=False, lag=lag,
+                                                 diff=False,
+                                                 feature_s_l=feature_s_l,
+                                                 lag=lag,
                                                  **kwargs)
     
     # Run autogression with different lags on diff of test scores w.r.t. year
@@ -429,7 +448,9 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
         print(model_s + ':')
         all_results_d[model_s] = fit_and_predict(main_data_a, AutoRegression,
                                                  aux_data_a_d=data_a_d,
-                                                 diff=True, lag=lag,
+                                                 diff=True,
+                                                 feature_s_l=feature_s_l,
+                                                 lag=lag,
                                                  **kwargs)
 
     # Run control: prediction is same as mean over years in training set
@@ -451,11 +472,16 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                            'z_same_as_last_year_score_control']
     all_train_mses_d = {key: value['cross_val_train_rms_error'] for (key, value) in all_results_d.iteritems()}    
     all_test_mses_d = {key: value['cross_val_test_rms_error'] for (key, value) in all_results_d.iteritems()}
-    for key, value in all_test_mses_d.iteritems():
-        print('\n{0}:'.format(key))
-        for chosen_baseline_s in chosen_baseline_s_l:
-            print('\t{0}: \n\t\t{1:1.5g}'.format(chosen_baseline_s,
-                  value/all_test_mses_d[chosen_baseline_s]))
+    all_models_s_l = sorted(all_results_d.keys())
+    with open(os.path.join(config.plot_path, 'RMSE_list.txt'), 'a') as f:
+        f.write('\n\n{0}:\n'.format(primary_feature_s))
+        for model_s in all_models_s_l:
+            f.write('\n{0}:\n'.format(model_s))
+            f.write('\tTrain RMSE:\n\t\t{:1.5f}\n'.format(all_train_mses_d[model_s]))
+            f.write('\tTest RMSE:\n\t\t{:1.5f}\n'.format(all_test_mses_d[model_s]))
+            for chosen_baseline_s in chosen_baseline_s_l:
+                f.write('\t{0}: \n\t\t{1:1.5g}\n'.format(chosen_baseline_s,
+                      all_test_mses_d[model_s]/all_test_mses_d[chosen_baseline_s]))
     
     
     ## Plot MSEs of all regression models     
@@ -519,4 +545,4 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
 
     
 if __name__ == '__main__':
-    main(aux_features=True, positive_control=False, regression_algorithm_s='elastic_cv', save_data=False)
+    main(aux_features=True, positive_control=False, regression_algorithm_s='elastic_net', save_data=False)

@@ -65,19 +65,10 @@ def bar_plot():
         axis.bar(1, score2, 1, color=color2_t, linewidth=0)
         axis.set_xlim([-0.25, 2.25])
         axis.set_xticks([0.5, 1.5])
-        axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)
+        axis.set_xticklabels(['1', '2'], fontsize=14)
         if all_database_stats_d[feature_s]['multiplier'] == 100:
             axis.set_ylim([0, 100])
-        metric_weight_sign = float(all_database_stats_d[feature_s]['metric_weight']) / \
-            float(abs(all_database_stats_d[feature_s]['metric_weight']))
-        if score1 * metric_weight_sign > score2 * metric_weight_sign:
-            color_s = color1_t
-        elif score2 * metric_weight_sign > score1 * metric_weight_sign:
-            color_s = color2_t
-        else:
-            color_s = 'k'
-        axis.set_title(all_database_stats_d[feature_s]['bar_plot_s'], fontsize=12, 
-                       color=color_s)
+        axis.set_title(all_database_stats_d[feature_s]['bar_plot_s'], fontsize=12)
     
     plot_num = num_plots
     axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
@@ -89,15 +80,9 @@ def bar_plot():
     axis.bar(1, overall_score2, 1, color=color2_t, linewidth=0)
     axis.set_xlim([-0.25, 2.25])
     axis.set_xticks([0.5, 1.5])
-    axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)   
+    axis.set_xticklabels(['1', '2'], fontsize=14)   
     axis.set_ylim([0, 100])
-    if overall_score1 > overall_score2:
-        color_s = color1_t
-    elif overall_score2 > overall_score1:
-        color_s = color2_t
-    else:
-        color_s = 'k'
-    axis.set_title('Overall score', fontweight='bold', fontsize=12, color=color_s)
+    axis.set_title('Overall score', fontweight='bold', fontsize=12)
     
     canvas = FigureCanvas(fig)
     output = StringIO.StringIO()
@@ -184,36 +169,13 @@ def schools_output():
                                       prediction_2_d[feature_s][-1])
                 else:
                     upper_bound = range_l_d[feature_s][1]
-                if metric_weight_d[feature_s] > 0:
-                    raw_score1 += prediction_1_d[feature_s][-1] * metric_weight_d[feature_s]
-                    raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s]
-                    max_possible_score += upper_bound * metric_weight_d[feature_s]
-                else:
-                    max_this_feature = -upper_bound * metric_weight_d[feature_s]
-                    raw_score1 += prediction_1_d[feature_s][-1] * metric_weight_d[feature_s] \
-                        + max_this_feature
-                    raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s] \
-                        + max_this_feature
-                    max_possible_score += max_this_feature
+                raw_score1 += prediction_1_d[feature_s][-1] * metric_weight_d[feature_s]
+                raw_score2 += prediction_2_d[feature_s][-1] * metric_weight_d[feature_s]
+                max_possible_score += upper_bound * metric_weight_d[feature_s]
             norm_score1 = raw_score1 / max_possible_score * 100
             norm_score2 = raw_score2 / max_possible_score * 100
-            bar_plot_message_1_s = 'In {0:d}, <font color="{3}">{1}</font> will perform better on statistics colored in <font color="{3}">orange</font> below, and <font color="{4}">{2}</font> will perform better on statistics colored in <font color="{4}">blue</font>.'.format(config.prediction_year_l[-1], schools1[0]['name'], schools2[0]['name'], color1_s, color2_s)
-            if norm_score1 != norm_score2:
-                bar_plot_message_2_s = '<b>Overall, <font color="{0}">{1}</font> will perform better than <font color="{2}">{3}</font> with a score of <font color="{0}">{4:0.0f}/100</font> vs. <font color="{2}">{5:0.0f}/100</font>.</b>'
-                if norm_score1 > norm_score2:
-                    bar_plot_message_2_s = bar_plot_message_2_s.format(color1_s,
-                                                                 schools1[0]['name'],
-                                                                 color2_s,
-                                                                 schools2[0]['name'],
-                                                                 norm_score1, norm_score2)
-                else:
-                    bar_plot_message_2_s = bar_plot_message_2_s.format(color2_s,
-                                                                 schools2[0]['name'],
-                                                                 color1_s,
-                                                                 schools1[0]['name'],
-                                                                 norm_score2, norm_score1)
-            else:
-                bar_plot_message_2_s = ' <b> Overall, both schools will perform equally well with a score of {0:0.0f}/100.</b>'.format(norm_score1)
+            bar_plot_message_1_s = 'School 1 ({0}) score = <font color="{1}">{2:0.1f}/100</font>'.format(schools1[0]['name'], color1_s, norm_score1)
+            bar_plot_message_2_s = 'School 2 ({0}) score = <font color="{1}">{2:0.1f}/100</font>'.format(schools2[0]['name'], color2_s, norm_score2)
             bar_plot_message_1_s = Markup(bar_plot_message_1_s)
             bar_plot_message_2_s = Markup(bar_plot_message_2_s)
                     
@@ -240,16 +202,18 @@ def schools_output():
                 else:
                     year_s = 'years'
                 if school1_predicted_difference > 0:
-                    output_message_s = 'Prediction: The {0} of <font color = "{5}">{4}</font> will be {1} higher in {2:d} {3}.'.format(feature_d['output_format_1_s'],
+                    output_message_s = 'Prediction: The {0} of <font color = "{5}">{4}</font> will be {1} higher than that of <font color = "{7}">{6}</font> in {2:d} {3}.'.format(feature_d['output_format_1_s'],
                         feature_d['output_format_2_s'],
                         num_years_prediction,
-                        year_s, schools1_past[0]['name'], color1_s)
+                        year_s, schools1_past[0]['name'], color1_s,
+                        schools2_past[0]['name'], color2_s)
                     output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
                 elif school1_predicted_difference < 0:
-                    output_message_s = 'Prediction: The {0} of <font color = "{5}">{4}</font> will be {1} higher in {2:d} {3}.'.format(feature_d['output_format_1_s'],
+                    output_message_s = 'Prediction: The {0} of <font color = "{5}">{4}</font> will be {1} higher than that of <font color = "{7}">{6}</font> in {2:d} {3}.'.format(feature_d['output_format_1_s'],
                         feature_d['output_format_2_s'],
                         num_years_prediction,
-                        year_s, schools2_past[0]['name'], color2_s)
+                        year_s, schools2_past[0]['name'], color2_s,
+                        schools1_past[0]['name'], color1_s)
                     output_message_s = output_message_s.format(feature_d['multiplier']*abs(school1_predicted_difference))
                 else:
                     output_message_s = "Prediction: the {0} of both schools will be equal in {2:d} {3}.".format(feature_d['output_format_1_s'],

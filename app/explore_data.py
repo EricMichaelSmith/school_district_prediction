@@ -29,8 +29,8 @@ def main():
     plot_cross_correlations_wrapper()
     plot_pairwise_correlations(change=True)
     plot_pairwise_correlations(change=False)
-    make_change_scatter_plot('dropout', 'teacher_number')
-    make_change_scatter_plot('budget', 'discount_lunch')
+#    make_change_scatter_plot('student_retention_rate', 'teacher_number')
+#    make_change_scatter_plot('budget', 'discount_lunch')
     
     
 
@@ -219,9 +219,11 @@ def plot_pairwise_correlations(change=True):
                 np.isnan(feature2_a)
             feature1_a = np.array(feature1_a[~is_none_b_a])
             feature2_a = np.array(feature2_a[~is_none_b_a])
-            heat_map_a[i_feature1, i_feature2] = \
+            slope, intercept, r_value, p_value, std_err = \
                 stats.linregress(np.array(feature1_a.tolist()),
-                                 np.array(feature2_a.tolist()))[2]
+                                 np.array(feature2_a.tolist()))
+            heat_map_a[i_feature1, i_feature2] = r_value
+            print('{0} and {1}:\n\tr-value {2:0.3f}, p-value {3:0.3g}\n\t{4:d} schools matched'.format(feature1_s, feature2_s, r_value, p_value, sum(is_none_b_a)))            
     
     # Create figure and heatmap axes
     fig = plt.figure(figsize=(10, 11))
