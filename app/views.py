@@ -65,7 +65,7 @@ def bar_plot():
         axis.bar(1, score2, 1, color=color2_t, linewidth=0)
         axis.set_xlim([-0.25, 2.25])
         axis.set_xticks([0.5, 1.5])
-        axis.set_xticklabels(['1', '2'], fontsize=14)
+        axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)
         if all_database_stats_d[feature_s]['multiplier'] == 100:
             axis.set_ylim([0, 100])
         axis.set_title(all_database_stats_d[feature_s]['bar_plot_s'], fontsize=12)
@@ -80,7 +80,7 @@ def bar_plot():
     axis.bar(1, overall_score2, 1, color=color2_t, linewidth=0)
     axis.set_xlim([-0.25, 2.25])
     axis.set_xticks([0.5, 1.5])
-    axis.set_xticklabels(['1', '2'], fontsize=14)   
+    axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)   
     axis.set_ylim([0, 100])
     axis.set_title('Overall score', fontweight='bold', fontsize=12)
     
@@ -174,8 +174,8 @@ def schools_output():
                 max_possible_score += upper_bound * metric_weight_d[feature_s]
             norm_score1 = raw_score1 / max_possible_score * 100
             norm_score2 = raw_score2 / max_possible_score * 100
-            bar_plot_message_1_s = 'School 1 ({0}) score = <font color="{1}">{2:0.1f}/100</font>'.format(schools1[0]['name'], color1_s, norm_score1)
-            bar_plot_message_2_s = 'School 2 ({0}) score = <font color="{1}">{2:0.1f}/100</font>'.format(schools2[0]['name'], color2_s, norm_score2)
+            bar_plot_message_1_s = '<font color="{1}">School 1 ({0}) score = {2:0.1f}/100</font>'.format(schools1[0]['name'], color1_s, norm_score1)
+            bar_plot_message_2_s = '<font color="{1}">School 2 ({0}) score = {2:0.1f}/100</font>'.format(schools2[0]['name'], color2_s, norm_score2)
             bar_plot_message_1_s = Markup(bar_plot_message_1_s)
             bar_plot_message_2_s = Markup(bar_plot_message_2_s)
                     
