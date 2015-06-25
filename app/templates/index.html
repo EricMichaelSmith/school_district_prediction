@@ -121,14 +121,14 @@
                     <hr class="primary">
                 </div>
             </div>
-        </div>
-        <div>
             <p>Prediction for the year 2017:</p>
             <ul class="ul-body">
                 <li class="li-body">{{ bar_plot_message_1_s }}</li>
                 <li class="li-body">{{ bar_plot_message_2_s }}</li>
             </ul>
-            <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
+            <div>
+                <center><img src="/bar_plot?ID1={{ ID1 }}&ID2={{ ID2 }}&{{ feature_list_s }}&score1={{ score1 }}&score2={{ score2 }}"></center>
+            </div>
         </div>
     </section>
 
@@ -167,9 +167,11 @@
     {% if feature_s %}
     <section id="time_series">
         <div class="container">
-            <div class="col-lg-12 text-center">
-                <h2 class="section-heading">Time trace</h2>
-                <hr class="primary">
+            <div class="row">
+                <div class="col-lg-12 text-center">
+                    <h2 class="section-heading">Time trace</h2>
+                    <hr class="primary">
+                </div>
             </div>
             <p>{{ output_message_s }}</p>
             <div>
