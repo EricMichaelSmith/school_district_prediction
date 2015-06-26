@@ -17,6 +17,7 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 #from sklearn.gaussian_process import GaussianProcess
 from sklearn.linear_model import ElasticNetCV, LinearRegression
 from sklearn.preprocessing import Imputer
+from statsmodels.tsa.arima_model import ARIMA
 
 import config
 reload(config)
@@ -203,6 +204,56 @@ class AutoRegression(object):
             prediction_a = results.predict(X)   
                         
         return prediction_a.reshape((-1, 1))
+        
+        
+        
+class IndependentAutoRegression(object):
+
+
+    def __init__(self):
+        pass
+
+
+    def fit(self, raw_array, holdout_col=0, lag=1, **kwargs):
+        """ Performs an auto-regression of a given lag on the input array, to each school separately. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the fitting, which is ideal for training the algorithm. """
+
+        # Apply optional parameters
+        if holdout_col > 0:
+            raw_array = raw_array[:, :-holdout_col]
+        array = raw_array
+        
+        # Create model and fit parameters
+        estimator = Imputer(axis=0)
+        array = estimator.fit_transform(array)
+        model_l = []
+        for school_a in array:
+            Y = school_a.reshape(-1)[lag:].reshape(-1)
+            X = np.ndarray((Y.shape[0], 0))
+            for i in range(lag):
+                X = np.concatenate((X, school_a[i:-lag+i].reshape(-1, 1)), axis=1)
+            model = LinearRegression(fit_intercept=True)
+            model.fit(X,Y)
+            model_l.append(model)
+        
+        return model_l
+        
+        
+    def predict(self, array, results_l,
+                holdout_col=0, lag=1, **kwargs):
+        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
+                
+        if holdout_col > 0:
+            array = array[:, :-holdout_col]
+
+        X = array[:, -lag:]
+        estimatorX = Imputer(axis=0)
+        X = estimatorX.fit_transform(X)
+        prediction_l = []
+        for i_school, school_a in enumerate(X):
+            prediction = results_l[i_school].predict(school_a)
+            prediction_l.append(prediction)
+                        
+        return np.array(prediction_l).reshape((-1, 1))
     
     
     
@@ -466,8 +517,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     all_results_d = {}
     
     # Run autoregression with different lags on raw test scores
-#    lag_l = range(1, 5)
-    lag_l = [1, 4]
+    lag_l = range(1, 5)
     for lag in lag_l:
         model_s = 'raw_lag{:d}'.format(lag)
         print(model_s + ':')
@@ -491,6 +541,16 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
 #                                                 aux_data_a_d=data_a_d,
 #                                                 diff=True,
 #                                                 feature_s_l=feature_s_l,
+#                                                 lag=lag,
+#                                                 **kwargs)
+
+#    lag_l = range(1, 5)
+#    for lag in lag_l:
+#        model_s = 'ind_raw_lag{:d}'.format(lag)
+#        print(model_s + ':')
+#        all_results_d[model_s] = fit_and_predict(main_data_a, IndependentAutoRegression,
+#                                                 primary_feature_s,
+#                                                 model_s,
 #                                                 lag=lag,
 #                                                 **kwargs)
 
@@ -578,7 +638,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     
     ## Save data to the SQL database
     if save_data:
-        model_to_save_s = 'raw_lag4'
+        model_to_save_s = 'raw_lag1'
         new_column_s_l = ['ENTITY_CD'] + \
             ['{0}_prediction_{1:d}'.format(primary_feature_s, year)
              for year in config.prediction_year_l]
@@ -592,8 +652,8 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
 
     
 if __name__ == '__main__':
-    main(aux_features=True,
+    main(aux_features=False,
          positive_control=False,
-         regression_algorithm_s='elastic_net',
+         regression_algorithm_s='linear_regression',
          plot_residuals=False,
          save_data=False)
