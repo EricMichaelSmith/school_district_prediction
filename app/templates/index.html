@@ -142,7 +142,7 @@
                     <form action="/output#time_series" method="GET">
                         <div class="form-group">
                             <label class="control-label" for="selectbasic">Statistic:</label>
-                            <select id="Feature" name="Feature" class="input-xlarge">
+                            <select id="Feature" name="Feature" class="input-xlarge dropdown">
                                 {% for dropdown_s in dropdown_s_l %}
                                     {% if dropdown_s == default_dropdown_s %}
                                         <option selected="selected">{{ dropdown_s }}</option>

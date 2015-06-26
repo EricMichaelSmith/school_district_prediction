@@ -486,3 +486,8 @@ img::-moz-selection {
 body {
     webkit-tap-highlight-color: #222;
 }
+
+.dropdown {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
