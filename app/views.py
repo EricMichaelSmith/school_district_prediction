@@ -299,8 +299,12 @@ def plot():
         
 
 def query_past_scores(feature_s, ID=None, name=None):
-    with db:
-        cur = db.cursor()
+    con = mdb.connect(host='localhost',
+                     user='root',
+                     passwd=config_unsynced.pword_s,
+                     db='joined')
+    with con:
+        cur = con.cursor()
         #just select the city from 'master' that the user inputs
         cur.execute('USE joined;')
         command_s = 'SELECT ENTITY_CD, ENTITY_NAME, '
@@ -329,8 +333,12 @@ def query_past_scores(feature_s, ID=None, name=None):
     
     
 def query_prediction_scores(feature_s, ID):
-    with db:
-        cur = db.cursor()
+    con = mdb.connect(host='localhost',
+                     user='root',
+                     passwd=config_unsynced.pword_s,
+                     db='joined')
+    with con:
+        cur = con.cursor()
         #just select the city from 'master' that the user inputs
         cur.execute('USE joined;')
         command_s = 'SELECT ENTITY_CD, '
@@ -352,8 +360,6 @@ def query_prediction_scores(feature_s, ID):
     
     
     
-db = mdb.connect(user="root", passwd=config_unsynced.pword_s,
-                 host="localhost", db="joined", charset='utf8')
 all_database_stats_d = join_data.collect_database_stats()
 
 color1_t = (0.6357, 0.2788, 0.0855) #ab4b17
