@@ -295,6 +295,12 @@ def plot():
     response = make_response(output.getvalue())
     response.mimetype = 'image/png'
     return response
+
+
+
+@app.route('/slides')
+def slides():
+    return render_template('slides.html')
         
         
 
