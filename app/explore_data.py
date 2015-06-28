@@ -11,7 +11,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-from scipy import stats
+from scipy import signal, stats
 
 import config
 reload(config)
@@ -25,13 +25,13 @@ reload(utilities)
 def main():
     """ Explore various aspects of the data. """
     
-    plot_feature_histograms()
+#    plot_feature_histograms()
     plot_cross_correlations_wrapper()
-    plot_pairwise_correlations(change=True)
-    plot_pairwise_correlations(change=False)
+#    plot_pairwise_correlations(change=True)
+#    plot_pairwise_correlations(change=False)
 #    make_change_scatter_plot('student_retention_rate', 'teacher_number')
 #    make_change_scatter_plot('budget', 'discount_lunch')
-    
+        
     
 
 def make_change_scatter_plot(feature1_s, feature2_s):
@@ -126,17 +126,77 @@ def plot_cross_correlations(plot_data_a_d, plot_name):
     fig = plt.figure(figsize=(2*len(feature_s_l), 2*len(feature_s_l)))
     for i, feature_i_s in enumerate(feature_s_l):
         for j, feature_j_s in enumerate(feature_s_l):
-            xcorr_a = np.ndarray((plot_data_a_d[feature_i_s].shape[0],
-                                  2*plot_data_a_d[feature_i_s].shape[1]-1))
-            for k_row in range(plot_data_a_d[feature_i_s].shape[0]):
-                xcorr_a[k_row, :] = np.correlate(plot_data_a_d[feature_i_s][k_row, :],
-                                              plot_data_a_d[feature_j_s][k_row, :],
+            
+            # For each school, standardize its time trace
+            num_years = plot_data_a_d[feature_i_s].shape[1]
+            per_school_mean_1_a = np.nanmean(plot_data_a_d[feature_i_s], axis=1).reshape(-1, 1)
+            per_school_std_1_a = np.nanstd(plot_data_a_d[feature_i_s], axis=1).reshape(-1, 1)
+            standard1_a = (plot_data_a_d[feature_i_s] -
+                           np.tile(per_school_mean_1_a, (1, num_years))) / \
+                          np.tile(per_school_std_1_a, (1, num_years))
+            per_school_mean_2_a = np.nanmean(plot_data_a_d[feature_j_s], axis=1).reshape(-1, 1)
+            per_school_std_2_a = np.nanstd(plot_data_a_d[feature_j_s], axis=1).reshape(-1, 1)
+            standard2_a = (plot_data_a_d[feature_j_s] -
+                           np.tile(per_school_mean_2_a, (1, num_years))) / \
+                          np.tile(per_school_std_2_a, (1, num_years))
+                          
+            # Simulate iid data
+            simulated1_a = np.random.normal(0, 1, 
+                (1e4, standard1_a.shape[1]))
+            if i == j:
+                simulated2_a = simulated1_a
+            else:
+                simulated2_a = np.random.normal(0, 1, 
+                    (1e4, standard2_a.shape[1]))
+            
+            xcorr_a = np.ndarray((standard1_a.shape[0],
+                                  2*standard1_a.shape[1]-1))
+            simulated_xcorr_a = np.ndarray((simulated1_a.shape[0],
+                                            2*simulated1_a.shape[1]-1))
+            for k_row in range(standard1_a.shape[0]):
+                xcorr_a[k_row, :] = np.correlate(standard1_a[k_row, :],
+                                              standard2_a[k_row, :],
                                               mode='full')
+            for k_row in range(simulated1_a.shape[0]):
+                simulated_xcorr_a[k_row, :] = \
+                    np.correlate(simulated1_a[k_row, :],
+                                 simulated2_a[k_row, :],
+                                 mode='full')
+                                    
             xcorr_a = xcorr_a[~np.any(np.isnan(xcorr_a), axis=1), :]
+            
+            # Calculate if correlation is significant
+            _, ttest_p_a = stats.ttest_ind(xcorr_a, simulated_xcorr_a, axis=0)
+            
+            # Correct for the size of the overlap
+            len_trace = standard1_a.shape[1]
+            normalization_a = np.array(range(1, len_trace+1) +
+                                       range(len_trace-1, 0, -1)).astype(float)
+            norm_mean_xcorr_a = np.mean(xcorr_a, axis=0) / normalization_a
+            norm_mean_simulated_xcorr_a = np.mean(simulated_xcorr_a, axis=0) / normalization_a
+            
             print('{0} and {1}: {2:d} schools'.format(feature_i_s, feature_j_s, xcorr_a.shape[0]))
             plot_number = len(feature_s_l)*i + j + 1
             ax = fig.add_subplot(len(feature_s_l), len(feature_s_l), plot_number)
-            ax.plot(np.mean(xcorr_a, axis=0))
+            for x, val in enumerate(ttest_p_a):
+                if val < 1e-6:
+                    ax.axvspan(x-0.5, x+0.5, facecolor=(1,0.8,0.8), alpha=1,
+                               linewidth=0)                    
+                elif val < 1e-4:
+                    ax.axvspan(x-0.5, x+0.5, facecolor=(1,0.9,0.9), alpha=1,
+                               linewidth=0)
+                elif val < 1e-2:
+                    ax.axvspan(x-0.5, x+0.5, facecolor=(1,0.95,0.95), alpha=1,
+                               linewidth=0)
+            ax.plot(np.zeros(norm_mean_xcorr_a.shape), color='k')
+            ax.plot(norm_mean_simulated_xcorr_a, color='r')
+            ax.plot(norm_mean_xcorr_a, color='b')
+            ax.set_ylim([1.2*min(np.concatenate((norm_mean_xcorr_a,
+                                                    norm_mean_simulated_xcorr_a),
+                                                   axis=1)),
+                          1.2*max(np.concatenate((norm_mean_xcorr_a,
+                                                    norm_mean_simulated_xcorr_a),
+                                                   axis=1))])
             ax.get_xaxis().set_ticks([])
             ax.get_yaxis().set_ticks([])
             if i == len(feature_s_l)-1:
