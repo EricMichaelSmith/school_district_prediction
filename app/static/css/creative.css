@@ -76,6 +76,10 @@ p {
     color: rgba(255,255,255,.7);
 }
 
+.vert-space {
+    margin-top: 50px;
+}
+
 section {
     padding: 50px 0;
 }
@@ -143,7 +147,7 @@ aside {
     }    
 
     .navbar-noheader {
-        background-color: #333;
+        background-color: #333 !important;
     }
 
     .navbar-default .navbar-header .navbar-brand {

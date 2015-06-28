@@ -103,7 +103,11 @@ def error():
 def schools_output():
     #pull 'Name1' and 'Name2' from input field and store them
     Name1 = request.args.get('Name1')
+    if not Name1:
+        Name1 = 'Long Island City High School'
     Name2 = request.args.get('Name2')
+    if not Name2:
+        Name2 = 'Queens Vocational And Technical High School'
     if 'Feature' in request.args:
         Feature = request.args.get('Feature')
     else:
