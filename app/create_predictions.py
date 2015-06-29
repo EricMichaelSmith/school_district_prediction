@@ -14,7 +14,7 @@ import os
 import pandas as pd
 from sklearn import cross_validation
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
-#from sklearn.gaussian_process import GaussianProcess
+from sklearn.gaussian_process import GaussianProcess
 from sklearn.linear_model import ElasticNetCV, LinearRegression
 from sklearn.preprocessing import Imputer
 from statsmodels.tsa.arima_model import ARIMA
@@ -124,6 +124,9 @@ class AutoRegression(object):
             # It's too slow when I make it high, so I'll keep it low for now
             model = ElasticNetCV(l1_ratio=l1_ratio_l, alphas=alpha_l, max_iter=max_iter,
                                  fit_intercept=True, normalize=True)
+        elif regression_algorithm_s == 'gaussian_process':
+            model = GaussianProcess()
+            # This currently gives the following error: "Exception: Multiple input features cannot have the same target value."
         elif regression_algorithm_s == 'gradient_boosting':
             model = GradientBoostingRegressor(max_features='sqrt')   
         elif regression_algorithm_s == 'linear_regression':
@@ -131,17 +134,18 @@ class AutoRegression(object):
         elif regression_algorithm_s == 'random_forest':
             model = RandomForestRegressor(max_features='auto')
         model.fit(X, Y)
-        with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
-            f.write('Lag of {0:d}:\n'.format(lag))
-#            f.write('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
-#                  (model.score(X, Y), model.l1_ratio_, model.alpha_))
-            coeff_t = model.coef_
-            assert(not positive_control) # The coefficients won't currently line up
-            for i_lag in range(lag):
-                f.write('\ti_lag = {0:d}: {1:0.2g}\n'.format(lag-i_lag, coeff_t[i_lag]))
-            for i_feature, feature_s in enumerate(feature_s_l):
+        if regression_algorithm_s in ['elastic_net', 'linear_regression']:
+            with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
+                f.write('Lag of {0:d}:\n'.format(lag))
+#                f.write('\nElastic net: R^2 = %0.5f, l1_ratio = %0.2f, alpha = %0.1g' %
+#                      (model.score(X, Y), model.l1_ratio_, model.alpha_))
+                coeff_t = model.coef_
+                assert(not positive_control) # The coefficients won't currently line up
                 for i_lag in range(lag):
-                    f.write('\t{0}:\n\t\ti_lag = {1:d}: {2:0.2g}\n'.format(feature_s, lag-i_lag, coeff_t[lag*(i_feature+1) + i_lag]))
+                    f.write('\ti_lag = {0:d}: {1:0.2g}\n'.format(lag-i_lag, coeff_t[i_lag]))
+                for i_feature, feature_s in enumerate(feature_s_l):
+                    for i_lag in range(lag):
+                        f.write('\t{0}:\n\t\ti_lag = {1:d}: {2:0.2g}\n'.format(feature_s, lag-i_lag, coeff_t[lag*(i_feature+1) + i_lag]))
         
         return model
         
