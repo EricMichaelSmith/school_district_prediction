@@ -17,7 +17,21 @@ import join_data
 @app.route('/index')
 @app.route('/input')
 def schools_input():
-  return render_template("index.html")
+    
+    con = mdb.connect(host='localhost',
+                     user='root',
+                     passwd=config_unsynced.pword_s,
+                     db='joined')
+    with con:
+        cur = con.cursor()
+        cur.execute("""
+SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
+        .format(config.year_l[-1]))
+        output_t_t = cur.fetchall()
+        school_s_l = list(set([output_t[0] for output_t in output_t_t]))
+
+    return render_template("index.html",
+                           school_s_l = school_s_l)
                          
                          
 
@@ -112,6 +126,18 @@ def schools_output():
         Feature = request.args.get('Feature')
     else:
         Feature = None
+        
+    con = mdb.connect(host='localhost',
+                     user='root',
+                     passwd=config_unsynced.pword_s,
+                     db='joined')
+    with con:
+        cur = con.cursor()
+        cur.execute("""
+SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
+        .format(config.year_l[-1]))
+        output_t_t = cur.fetchall()
+        school_s_l = list(set([output_t[0] for output_t in output_t_t]))
     
     
     ## Check if inputs correspond to valid schools
@@ -240,6 +266,7 @@ def schools_output():
                                Name2 = Name2,
                                ID1 = schools1[0]['school_id'],
                                ID2 = schools2[0]['school_id'],
+                               school_s_l = school_s_l,
                                bar_plot_message_1_s = bar_plot_message_1_s,
                                bar_plot_message_2_s = bar_plot_message_2_s,
                                feature_list_s = feature_list_s,

@@ -101,17 +101,22 @@
                         <div class="form-group">
                           <label for="Name1">School Name 1:</label>
                           {% if Name1 %}
-                            <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:420px; color:#333">
+                            <input type="text" id="Name1" name='Name1' value="{{ Name1 }}" style="width:420px; color:#333" list="school_s_l">
                           {% else %}
-                            <input type="text" id="Name1" name='Name1' placeholder="e.g. Long Island City High School" style="width:420px; color:#333">
+                            <input type="text" id="Name1" name='Name1' placeholder="e.g. Long Island City High School" style="width:420px; color:#333" list="school_s_l">
                           {% endif %}
                           <br>
                           <label for="Name2">School Name 2:</label>
                           {% if Name2 %}
-                            <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px; color:#333">
+                            <input type="text" id="Name2" name='Name2' value="{{ Name2 }}" style="width:420px; color:#333" list="school_s_l">
                           {% else %}
-                            <input type="text" id="Name2" name='Name2' placeholder="e.g. Queens Vocational And Technical High School" style="width:420px; color:#333">
+                            <input type="text" id="Name2" name='Name2' placeholder="e.g. Queens Vocational And Technical High School" style="width:420px; color:#333" list="school_s_l">
                           {% endif %}
+                          <datalist id="school_s_l">
+                          {% for school_s in school_s_l %}
+                            <option>{{ school_s }}</option>
+                          {% endfor %}
+                          </datalist>
                           <br>
                         </div>
                         <div>
