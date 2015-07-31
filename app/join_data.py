@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pandas as pd
 
-
 import config
 reload(config)
 import utilities
@@ -16,12 +15,13 @@ reload(utilities)
 
 
 def main():
-    
-    find_school_key()    
-    
+
+    find_school_key()
+
+    # Load all databases that join on school ID and join all years for each feature
     for Database in Database_l:
         instance = Database()
-        con = utilities.connect_to_sql('temp')    
+        con = utilities.connect_to_sql('temp')
         with con:
             cur = con.cursor()
             for year in config.year_l:
@@ -30,7 +30,8 @@ def main():
         with con:
             cur = con.cursor()
             join_years(cur, instance.new_table_s, 'ENTITY_CD')
-            
+
+    # Load all databases that join on school district ID and join all years for each feature
     for Database in DistrictDatabase_l:
         instance = Database()
         for year in config.year_l:
@@ -39,15 +40,18 @@ def main():
         with con:
             cur = con.cursor()
             join_years(cur, instance.new_table_s, 'district')
-            
+
+    # Join all databases of features together
     con = utilities.connect_to_sql('joined')
     with con:
         cur = con.cursor()
         join_databases(cur, Database_l, DistrictDatabase_l)
-        
-        
-        
+
+
+
 def collect_database_stats():
+    """ Create a master dictionary of parameters of each feature in the database """
+
     all_Database_l = Database_l + DistrictDatabase_l
     all_database_stats_d = {}
     for Database in all_Database_l:
@@ -77,8 +81,8 @@ def extract_table_name(Class):
 
 def find_school_key():
     """ Creates a table of each school ID and name """
-    
-    con = utilities.connect_to_sql('joined')    
+
+    con = utilities.connect_to_sql('joined')
     with con:
         cur = con.cursor()
         command_s = 'DROP TABLE IF EXISTS school_key;'
@@ -105,18 +109,18 @@ AND ENTITY_CD != '241001060003'"""
         command_s = """ALTER TABLE school_key
 ADD INDEX ENTITY_CD (ENTITY_CD)"""
         cur.execute(command_s)
-        
-        
+
+
 
 def join_databases(cur, Database_l, DistrictDatabase_l):
     """ Join all databases """
-    
+
     master_database_s = 'master'
     individual_database_s_l = [extract_table_name(Database) for Database in Database_l]
     individual_district_database_s_l = [extract_table_name(Database) for Database in DistrictDatabase_l]
-    
+
     print('Starting join_databases')
-    
+
     cur.execute('DROP TABLE IF EXISTS {0}'.format(master_database_s))
     command_s = """CREATE TABLE {0}
 SELECT * FROM school_key""".format(master_database_s)
@@ -142,16 +146,16 @@ ON school_key.district = {0}.district_{0}"""
         command_s += this_table_command_s
     command_s += ';'
     cur.execute(command_s)
-    
+
     print('Database {0} created.'.format(master_database_s))
-        
-        
-        
+
+
+
 def join_years(cur, new_table_s, join_s):
     """ Join separate years of a database that was just extracted into the temp database """
-    
+
     print('Starting join_years for {0}'.format(new_table_s))
-    
+
     cur.execute('DROP TABLE IF EXISTS {0};'.format(new_table_s))
     command_s = """CREATE TABLE {0}
 SELECT * FROM school_key""".format(new_table_s)
@@ -165,14 +169,14 @@ ON school_key.{1} = temp.temp{0:d}_final.{1}_{0:d}"""
     cur.execute(command_s)
     command_s = """ALTER TABLE {0} CHANGE {1} {1}_{0} CHAR(12);"""
     cur.execute(command_s.format(new_table_s, join_s))
-    
+
     print('Database {0} created.'.format(new_table_s))
-    
-    
-    
+
+
+
 class Budget(object):
     """ Yearly budget """
-    
+
     def __init__(self):
         self.description_s = 'Annual budget of school district\n(thousands of dollars)'
         self.explanatory_name = 'Budget'
@@ -189,8 +193,8 @@ class Budget(object):
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
-        
-                             
+
+
     def extract(self, year):
 
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
@@ -204,12 +208,12 @@ class Budget(object):
         final_df = trimmed_df.set_index('district_{0}'.format(year))
         utilities.write_to_sql_table(final_df, 'temp{0:d}_final'.format(year),
                                      'temp')
-    
-    
+
+
 
 class DiscountLunch(object):
     """ Fraction of students receiving reduced or free lunch """
-    
+
     def __init__(self):
         self.description_s = 'Students receiving reduced-price or free lunch (%)'
         self.explanatory_name = 'Reduced or free lunch'
@@ -222,15 +226,15 @@ class DiscountLunch(object):
         self.in_metric = False
         self.metric_weight = None
         self.bar_plot_s = None
-        
-        
+
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
@@ -245,7 +249,7 @@ WHERE PER_FREE_LUNCH = 's' OR PER_REDUCED_LUNCH = 's';"""
         command_s = """UPDATE temp{0:d}
 SET {1}_{0:d} = (PER_FREE_LUNCH + PER_REDUCED_LUNCH) / 100;"""
         cur.execute(command_s.format(year, self.new_table_s))
-            
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d}_final
@@ -255,23 +259,23 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
+
+
 
 class EighthELAScore(object):
     """ Mean score on 8th grade English exams """
-    
+
     def __init__(self):
         self.new_table_s = 'eighth_ela_score'
         self.orig_table_s_d = {year:'ELA8 Subgroup Results' for year in range(2007, 2015)}
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -295,23 +299,23 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
+
+
 
 class EighthMathScore(object):
     """ Mean score on 8th grade math exams """
-    
+
     def __init__(self):
         self.new_table_s = 'eighth_math_score'
         self.orig_table_s_d = {year:'Math8 Subgroup Results' for year in range(2007, 2015)}
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -335,23 +339,23 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class EighthScienceScore(object):
     """ Mean score on 8th grade science exams """
-    
+
     def __init__(self):
         self.new_table_s = 'eighth_science_score'
         self.orig_table_s_d = {year:'Science8 Subgroup Results' for year in range(2007, 2015)}
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -375,12 +379,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class PopTwelfth(object):
     """ Population of 12th grade """
-    
+
     def __init__(self):
         self.description_s = '12th grade population'
         self.explanatory_name = 'Population of 12th grade'
@@ -394,14 +398,14 @@ class PopTwelfth(object):
         self.metric_weight = None
         self.bar_plot_s = None
 
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -422,12 +426,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class PostSecondary(object):
     """ Fraction of students receiving some sort of post-secondary education after high school """
-    
+
     def __init__(self):
         self.description_s = 'Percentage of graduates attending college\nor other post-secondary education'
         self.explanatory_name = 'Post-secondary education'
@@ -443,14 +447,14 @@ class PostSecondary(object):
         self.metric_weight = 1
         self.bar_plot_s = 'College / post-secondary\nattendance rate (%)'
 
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -494,11 +498,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
+
 
 
 class RegentsPassRate(object):
-    
+    """ Fraction of students passing the senior-level Regents exam """
+
     def __init__(self):
         self.description_s = 'Percent passing Regents Exams\n(averaged over subjects)'
         self.explanatory_name = 'Regents Exams pass rate'
@@ -525,9 +530,9 @@ class RegentsPassRate(object):
 
     def extract(self, cur, year):
         """ Returns an N-by-3 of the ENTITY_CD, SUBJECT, and pass rate """
-        
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
@@ -610,12 +615,12 @@ CHANGE `AVG(fraction_passing_{0:d})` {1}_{0:d} FLOAT;"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class StudentRetentionRate(object):
     """ Fraction of students who did not drop out out of school """
-    
+
     def __init__(self):
         self.description_s = 'Student retention rate (%)'
         self.explanatory_name = 'Student retention rate'
@@ -628,15 +633,15 @@ class StudentRetentionRate(object):
         self.in_metric = True
         self.metric_weight = 1
         self.bar_plot_s = 'Student retention\nrate (%)'
-        
-        
+
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -657,12 +662,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class TeacherNumber(object):
     """ Number of teachers """
-    
+
     def __init__(self):
         self.description_s = 'Number of teachers'
         self.explanatory_name = 'Number of teachers'
@@ -676,14 +681,14 @@ class TeacherNumber(object):
         self.metric_weight = None
         self.bar_plot_s = None
 
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -704,12 +709,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class TeacherRetentionRate(object):
     """ Retention rate of all teachers """
-    
+
     def __init__(self):
         self.description_s = 'Teacher retention rate (%)'
         self.explanatory_name = 'Teacher retention rate'
@@ -723,14 +728,14 @@ class TeacherRetentionRate(object):
         self.metric_weight = 1
         self.bar_plot_s = 'Teacher retention\nrate (%)'
 
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = 'CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`;'
@@ -745,7 +750,7 @@ WHERE PER_TURN_ALL = 's';"""
         command_s = """UPDATE temp{0:d}
 SET {1}_{0:d} = 1 - (PER_TURN_ALL / 100);"""
         cur.execute(command_s.format(year, self.new_table_s))
-            
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d}_final;'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d}_final
@@ -755,12 +760,12 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
-        
+
+
+
 class TenthClassSize(object):
     """ Mean class size of 10-grade English, math, science, and social studies """
-    
+
     def __init__(self):
         self.description_s = 'Size of 10th grade classes\n(averaged over English, math, science, and social studies)'
         self.explanatory_name = 'Average classroom size'
@@ -774,14 +779,14 @@ class TenthClassSize(object):
         self.metric_weight = -0.01
         self.bar_plot_s = 'Avg. class size\n'
 
-        
+
     def extract(self, cur, year):
         """ Returns an N-by-2 of the ENTITY_CD and value """
-        
-        assert(year >= 2007)        
-        
+
+        assert(year >= 2007)
+
         print('Creating {0} for year {1:d}'.format(self.new_table_s, year))
-        
+
         command_s = 'DROP TABLE IF EXISTS temp{0:d};'
         cur.execute(command_s.format(year))
         command_s = """CREATE TABLE temp{0:d} SELECT * FROM SRC{0:d}.`{1}`
@@ -802,8 +807,8 @@ WHERE YEAR = {0:d};"""
         command_s = """ALTER TABLE temp{0:d}_final
 ADD INDEX ENTITY_CD_{0:d} (ENTITY_CD_{0:d});"""
         cur.execute(command_s.format(year))
-        
-        
+
+
 
 Database_l = [DiscountLunch,
               PopTwelfth,
@@ -815,8 +820,8 @@ Database_l = [DiscountLunch,
               TenthClassSize]
 DistrictDatabase_l = [Budget]
 # Features removed: EighthELAScore, EighthMathScore, EighthScienceScore
-        
-            
+
+
 
 if __name__ == '__main__':
     main()

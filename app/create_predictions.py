@@ -5,7 +5,7 @@ Created on Tue Jun  9 11:44:57 2015
 
 @author: Eric
 
-Just visualize the data
+Create predictions for future school performance
 """
 
 import matplotlib.pyplot as plt
@@ -29,12 +29,13 @@ reload(utilities)
 
 
 def main(**kwargs):
-    
-    
-    ## Read in data    
+    """ Read in all data and run the fits/predictions over all school statistics separately """
+
+
+    ## Read in data
     con = utilities.connect_to_sql('joined')
     with con:
-        cur = con.cursor() 
+        cur = con.cursor()
         data_a_d = {}
         all_Database_l = join_data.Database_l + join_data.DistrictDatabase_l
         for Database in all_Database_l:
@@ -45,38 +46,15 @@ def main(**kwargs):
             data_a_d[feature_s] = utilities.select_data(con, cur, field_s_l,
                                                         'master',
                                                         output_type='np_array')
-                                                        
+
     ## Run prediction over all features
     for feature_s in data_a_d.iterkeys():
-        predict_a_feature(data_a_d, feature_s, **kwargs)   
-        
-    
-
-# Let's think about applying statsmodels' ARIMA model later: I'm thinking that the way to do this is to bring in all data except for one high school's time series data using the "exog" keyword, but I don't think that's truly cross-sectional: "exog" seems to be more useful for predicting future test pass rates from past past rates and funding level, for example, not from past pass rates of the school in question and all other schools. And Des seems to be right that vector ARIMA isn't the way to go here, because it seems like each sample in the cross-section still gets its own fitted variables, right?
-#class ARIMA(object):
-#    
-#    def __init__(self):
-#        pass
-#
-#    def fit(self, raw_array, order_t=(0,0,0)):
-#        """ Performs an ARIMA on raw_array given (p,d,q) as order_t. Axis 0 indexes observations (schools) and axis 1 indexes years. """
-#
-#        results = sm.tsa.ARIMA(raw_array.transpose(), order_t).fit()
-#        print('(p, d, q) = ({0:d}, {0:d}, {0:d}):'.format(order_t[0],
-#                                                          order_t[1],
-#                                                          order_t[2]))
-#        print(results.params)
-#        
-#        return results
-#                
-#    def predict(self, raw_array, results, order_t=(0,0,0))
-#        """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. """
-#
-#        # {{{}}}
+        predict_a_feature(data_a_d, feature_s, **kwargs)
 
 
 
 class AutoRegression(object):
+    """ The main ARIMA object used for fitting and prediction """
 
     def __init__(self):
         pass
@@ -91,7 +69,7 @@ class AutoRegression(object):
             array = np.diff(raw_array, 1, axis=1)
         else:
             array = raw_array
-        
+
         # Create model and fit parameters
         Y = array[:, lag:].reshape(-1)
         X = np.ndarray((Y.shape[0], 0))
@@ -99,7 +77,7 @@ class AutoRegression(object):
             X = np.concatenate((X, array[:, i:-lag+i].reshape(-1, 1)), axis=1)
             # Y = X_t = A_1 * X_(t-lag) + A_2 * X_(t-lag+1)) + ... + A_lag * X_(t-1) + A_(lag+1)
         if positive_control:
-            X = np.concatenate((X, array[:, lag:].reshape(-1, 1)), axis=1)                
+            X = np.concatenate((X, array[:, lag:].reshape(-1, 1)), axis=1)
         if aux_data_a_d:
             for feature_s in feature_s_l:
                 if holdout_col > 0:
@@ -119,7 +97,7 @@ class AutoRegression(object):
 
         if regression_algorithm_s == 'elastic_net':
             l1_ratio_l = [.1, .5, .7, .9, .95, .99, 1]
-            alpha_l = np.logspace(-15, 5, num=11).tolist()      
+            alpha_l = np.logspace(-15, 5, num=11).tolist()
             max_iter = 1e5
             # It's too slow when I make it high, so I'll keep it low for now
             model = ElasticNetCV(l1_ratio=l1_ratio_l, alphas=alpha_l, max_iter=max_iter,
@@ -128,7 +106,7 @@ class AutoRegression(object):
             model = GaussianProcess()
             # This currently gives the following error: "Exception: Multiple input features cannot have the same target value."
         elif regression_algorithm_s == 'gradient_boosting':
-            model = GradientBoostingRegressor(max_features='sqrt')   
+            model = GradientBoostingRegressor(max_features='sqrt')
         elif regression_algorithm_s == 'linear_regression':
             model = LinearRegression(fit_intercept=True, normalize=True)
         elif regression_algorithm_s == 'random_forest':
@@ -146,13 +124,13 @@ class AutoRegression(object):
                 for i_feature, feature_s in enumerate(feature_s_l):
                     for i_lag in range(lag):
                         f.write('\t{0}:\n\t\ti_lag = {1:d}: {2:0.2g}\n'.format(feature_s, lag-i_lag, coeff_t[lag*(i_feature+1) + i_lag]))
-        
+
         return model
-        
+
     def predict(self, raw_array, results, aux_data_a_d=None, diff=False,
                 holdout_col=0, lag=1, positive_control=False, **kwargs):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
-        
+
         if positive_control:
             if holdout_col > 0:
                 if diff:
@@ -167,7 +145,7 @@ class AutoRegression(object):
                     control_array = raw_array[:, -holdout_col]
             else:
                 control_array = np.random.randn(raw_array.shape[0], 1)
-                
+
         if holdout_col > 0:
             raw_array = raw_array[:, :-holdout_col]
         prediction_raw_array = raw_array
@@ -205,13 +183,14 @@ class AutoRegression(object):
                     X = np.concatenate((X, array[:, -lag:]), axis=1)
             estimatorX = Imputer(axis=0)
             X = estimatorX.fit_transform(X)
-            prediction_a = results.predict(X)   
-                        
+            prediction_a = results.predict(X)
+
         return prediction_a.reshape((-1, 1))
-        
-        
-        
+
+
+
 class IndependentAutoRegression(object):
+    """ What happens if you assume that each school has its own behavior over time and fit an auto-regressive model to each school separately? The answer is that you get very noisy predictions. """
 
 
     def __init__(self):
@@ -225,7 +204,7 @@ class IndependentAutoRegression(object):
         if holdout_col > 0:
             raw_array = raw_array[:, :-holdout_col]
         array = raw_array
-        
+
         # Create model and fit parameters
         estimator = Imputer(axis=0)
         array = estimator.fit_transform(array)
@@ -238,14 +217,14 @@ class IndependentAutoRegression(object):
             model = LinearRegression(fit_intercept=True)
             model.fit(X,Y)
             model_l.append(model)
-        
+
         return model_l
-        
-        
+
+
     def predict(self, array, results_l,
                 holdout_col=0, lag=1, **kwargs):
         """ Given the input results model, predicts the year of data immediately succeeding the last year of the input array. Axis 0 indexes observations (schools) and axis 1 indexes years. For holdout_col>0, the last holdout_col years of data will be withheld from the prediction, which is ideal for finding the error of the algorithm. """
-                
+
         if holdout_col > 0:
             array = array[:, :-holdout_col]
 
@@ -256,19 +235,20 @@ class IndependentAutoRegression(object):
         for i_school, school_a in enumerate(X):
             prediction = results_l[i_school].predict(school_a)
             prediction_l.append(prediction)
-                        
+
         return np.array(prediction_l).reshape((-1, 1))
-    
-    
-    
+
+
+
 class MeanOverYears(object):
-    
+    """ Baseline: assume that next year's value will be the same as the mean over the previous years, a.k.a. the historical average """
+
     def __init__(self):
         pass
-    
+
     def fit(self, array, **kwargs):
         return None
-        
+
     def predict(self, array, results, holdout_col=0, **kwargs):
         if holdout_col > 0:
             array = array[:, :-holdout_col]
@@ -278,47 +258,50 @@ class MeanOverYears(object):
 
 
 class SameAsLastYear(object):
-    
+    """ Baseline: assume that next year's value will be the same as last year's value """
+
     def __init__(self):
         pass
-    
+
     def fit(self, array, **kwargs):
         return None
-        
+
     def predict(self, array, results, holdout_col=0, **kwargs):
         if holdout_col > 0:
             array = array[:, :-holdout_col]
         last_year_a = array[:, -1]
         return last_year_a.reshape((-1, 1))
-        
-        
-        
+
+
+
 class SameChangeAsLastYear(object):
-    
+    """ Baseline: assume that the change between this year and next year's values will be the same as the change between last year and this year's values """
+
     def __init__(self):
         pass
-    
+
     def fit(self, array, **kwargs):
         return None
-        
+
     def predict(self, array, results, holdout_col=0, **kwargs):
         if holdout_col > 0:
             array = array[:, :-holdout_col]
         change_over_last_year_a = array[:, -1] - array[:, -2]
         extrapolation_from_last_year_a = array[:, -1] + change_over_last_year_a
         return extrapolation_from_last_year_a.reshape((-1, 1))
-        
-        
-        
+
+
+
 def find_rms_error(Y, prediction_Y,
                    plot_residuals=False, residual_plot_name_s='',
                    **kwargs):
-    
+    """ Calculate the root-mean-squared error between the actual data and the prediction """
+
     assert(Y.shape == prediction_Y.shape)
     valid_col_a = ~np.isnan(Y)
     residual_a = Y[valid_col_a] - prediction_Y[valid_col_a]
     rmse = np.sqrt(np.mean((residual_a)**2))
-    
+
     if plot_residuals:
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -332,29 +315,29 @@ def find_rms_error(Y, prediction_Y,
         if not os.path.isdir(save_path):
             os.mkdir(save_path)
         plt.savefig(os.path.join(save_path, residual_plot_name_s + '.png'))
-    
+
     return rmse
-    
-    
-    
+
+
+
 def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwargs):
-    """ Given an array, fits it using Class and the optional options. """
-    
-    num_years_to_predict = len(config.prediction_year_l)    
-    
+    """ Given an array, fits it using the regression technique specified by Class and the optional options. """
+
+    num_years_to_predict = len(config.prediction_year_l)
+
     instance = Class()
     results_d = {}
-     
-    
+
+
     ## Training set: all years before the most recent
-    
+
     # Fit on all years before the most recent
     with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
         f.write('(fit on all years but last)\n')
     results_d['result_object'] = instance.fit(array, holdout_col=1,
                                               aux_data_a_d=aux_data_a_d,
                                               **kwargs)
-                                              
+
     # Measure training set error
     last_fitted_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
@@ -367,7 +350,7 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
         last_fitted_year_prediction_a.reshape(-1),
         residual_plot_name_s=residual_plot_name_s,
         **kwargs)
-        
+
     # Measure error of most recent year of data as a test set
     last_data_year_prediction_a = \
         instance.predict(array, results_d['result_object'],
@@ -379,8 +362,8 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
     results_d[result_s] = find_rms_error(array[:, -1].reshape(-1),
         last_data_year_prediction_a.reshape(-1),
         residual_plot_name_s=residual_plot_name_s,
-        **kwargs)   
-        
+        **kwargs)
+
     # Predict future values
     future_prediction_a = np.ndarray((array.shape[0], 0))
     for year in range(num_years_to_predict):
@@ -392,16 +375,16 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
         future_prediction_a = np.concatenate((future_prediction_a,
                                               new_year_prediction_a), axis=1)
     results_d['prediction_a'] = future_prediction_a
-    
-        
+
+
     ## Perform 10-fold cross validation
-    
+
     kf = cross_validation.KFold(array.shape[0], n_folds=10, shuffle=True)
     cross_val_train_rmse_l = []
     cross_val_test_rmse_l = []
     for train_index, test_index in kf:
 #        print('TRAIN:', len(train_index), 'TEST:', len(test_index))
-        
+
         # Creating new aux dicts
         if aux_data_a_d:
             aux_train_a_d = {}
@@ -412,8 +395,8 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
         else:
             aux_train_a_d = None
             aux_test_a_d = None
-            
-        
+
+
         # Train model
         instance = Class()
         with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
@@ -431,7 +414,7 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
                                         **kwargs)
         cross_val_train_rmse_l.append(find_rms_error(array[train_index, -1].reshape(-1),
             train_prediction_a.reshape(-1), **kwargs))
-                              
+
         # Find test RMSE
         test_prediction_a = instance.predict(array[test_index, :],
                                         result,
@@ -440,23 +423,23 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
                                         **kwargs)
         cross_val_test_rmse_l.append(find_rms_error(array[test_index, -1].reshape(-1),
             test_prediction_a.reshape(-1), **kwargs))
-    
+
 #    print('Cross-val train RMSE:', cross_val_train_rmse_l)
 #    print('Cross-val test RMSE:', cross_val_test_rmse_l)
     results_d['cross_val_train_rms_error'] = np.mean(cross_val_train_rmse_l)
     results_d['cross_val_test_rms_error'] = np.mean(cross_val_test_rmse_l)
-    
-    
+
+
     ## Validating based on RMSE of prediction 3 years out
-    
+
     # Fit on all years before the most recent 3
     with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
         f.write('(fit on all years but last 3)\n')
     instance = Class()
-    result = instance.fit(array, holdout_col=3, 
+    result = instance.fit(array, holdout_col=3,
                           aux_data_a_d=aux_data_a_d,
                           **kwargs)
-                                              
+
     # Measure training set error
     three_year_train_prediction_a = \
         instance.predict(array, result,
@@ -469,7 +452,7 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
         three_year_train_prediction_a.reshape(-1),
         residual_plot_name_s=residual_plot_name_s,
         **kwargs)
-        
+
     # Measure error of most recent year of data as a test set
     future_prediction_a = np.ndarray((array.shape[0], 0))
     for year in range(3):
@@ -486,28 +469,29 @@ def fit_and_predict(array, Class, feature_s, model_s, aux_data_a_d=None, **kwarg
         future_prediction_a[:, -1].reshape(-1),
         residual_plot_name_s=residual_plot_name_s,
         **kwargs)
-        
+
     return results_d
-    
-    
+
+
 
 def predict_a_feature(input_data_a_d, primary_feature_s,
                       aux_features=True, save_data=False,
                       **kwargs):
-    
+    """ Wraps around fit_and_predict: runs various regression models on the input school statistic and outputs/plots the results """
+
     print('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
     with open(os.path.join(config.plot_path, 'coeff_list.txt'), 'a') as f:
         f.write('\n\nStarting prediction for {0}.\n'.format(primary_feature_s))
-    
+
     data_a_d = input_data_a_d.copy()
     index_a = data_a_d[primary_feature_s][:, 0]
-        
-    
+
+
     ## Drop the ENTITY_CD column
     for feature_s in data_a_d.iterkeys():
         data_a_d[feature_s] = data_a_d[feature_s][:, 1:]
-        
-        
+
+
     ## Split data
     main_data_a = data_a_d[primary_feature_s]
     data_a_d.pop(primary_feature_s)
@@ -515,11 +499,11 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     if not aux_features:
         data_a_d = {}
         feature_s_l = []
-    
-    
-    ## Run regression models, validate and predict future scores, and run controls    
+
+
+    ## Run regression models, validate and predict future scores, and run controls
     all_results_d = {}
-    
+
     # Run autoregression with different lags on raw test scores
     lag_l = range(1, 5)
     for lag in lag_l:
@@ -533,7 +517,7 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                                                  feature_s_l=feature_s_l,
                                                  lag=lag,
                                                  **kwargs)
-    
+
 #    # Run autogression with different lags on diff of test scores w.r.t. year
 #    lag_l = range(1, 4)
 #    for lag in lag_l:
@@ -564,14 +548,14 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     all_results_d[model_s] = fit_and_predict(main_data_a, MeanOverYears,
                                              primary_feature_s, model_s,
                                              **kwargs)
-    
+
     # Run control: prediction is same as previous year's data
     model_s = 'z_same_as_last_year_score_control'
     print(model_s + ':')
     all_results_d[model_s] = fit_and_predict(main_data_a, SameAsLastYear,
                                              primary_feature_s, model_s,
                                              **kwargs)
-    
+
     # Run control: prediction is same as previous year's data
     model_s = 'z_same_change_as_last_year_score_control'
     print(model_s + ':')
@@ -579,9 +563,9 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                                              primary_feature_s, model_s,
                                              **kwargs)
 
-    chosen_baseline_s_l = ['z_mean_over_years_score_control',               
+    chosen_baseline_s_l = ['z_mean_over_years_score_control',
                            'z_same_as_last_year_score_control']
-    all_train_mses_d = {key: value['cross_val_train_rms_error'] for (key, value) in all_results_d.iteritems()}    
+    all_train_mses_d = {key: value['cross_val_train_rms_error'] for (key, value) in all_results_d.iteritems()}
     all_test_mses_d = {key: value['cross_val_test_rms_error'] for (key, value) in all_results_d.iteritems()}
     all_models_s_l = sorted(all_results_d.keys())
     with open(os.path.join(config.plot_path, 'RMSE_list.txt'), 'a') as f:
@@ -593,14 +577,14 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
             for chosen_baseline_s in chosen_baseline_s_l:
                 f.write('\t{0}: \n\t\t{1:1.5g}\n'.format(chosen_baseline_s,
                       all_test_mses_d[model_s]/all_test_mses_d[chosen_baseline_s]))
-    
-    
-    ## Plot MSEs of all regression models     
-    
+
+
+    ## Plot MSEs of all regression models
+
     model_s_l = sorted(all_train_mses_d.keys())
     fig = plt.figure(figsize=(1.5*len(model_s_l),12))
     ax = fig.add_axes([0.10, 0.40, 0.80, 0.50])
-    
+
     # Generating bar values
     value_s_l = ['train_rms_error', 'test_rms_error',
                'cross_val_train_rms_error', 'cross_val_test_rms_error',
@@ -609,21 +593,21 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
     for value_s in value_s_l:
         value_l_d[value_s] = [all_results_d[iter_model_s][value_s]\
                               for iter_model_s in model_s_l]
-    
+
     # Generate bar positions
     bar_width = 0.12
     value_position_l_d = {}
     for i_value, value_s in enumerate(value_s_l):
         value_position_l_d[value_s] = np.arange(len(model_s_l)) + (i_value-3)*bar_width
-        
+
     # Generate colors
     value_color_l = ['r', 'y', 'g', 'c', 'b', 'm']
-    
+
     # Plot bars
     for i_value, value_s in enumerate(value_s_l):
         ax.bar(value_position_l_d[value_s], value_l_d[value_s], bar_width,
                color=value_color_l[i_value], label=value_s)
-    
+
     # Formatting
     ax.set_title('Comparison of RMS error of autoregression algorithms vs. controls')
     ax.set_xticks(np.arange(len(model_s_l)))
@@ -638,8 +622,8 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
         os.mkdir(save_path)
     plt.savefig(os.path.join(save_path,
                              'rms_error_all_models__{0}.png'.format(primary_feature_s)))
-    
-    
+
+
     ## Save data to the SQL database
     if save_data:
         model_to_save_s = 'raw_lag1'
@@ -651,10 +635,10 @@ def predict_a_feature(input_data_a_d, primary_feature_s,
                                       axis=1)
         prediction_df = pd.DataFrame(prediction_a, columns=new_column_s_l)
         utilities.write_to_sql_table(prediction_df,
-                                     '{0}_prediction'.format(primary_feature_s), 'joined')    
-    
+                                     '{0}_prediction'.format(primary_feature_s), 'joined')
 
-    
+
+
 if __name__ == '__main__':
     main(aux_features=False,
          positive_control=False,
