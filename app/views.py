@@ -17,7 +17,7 @@ import join_data
 @app.route('/index')
 @app.route('/input')
 def schools_input():
-    
+
     con = mdb.connect(host='localhost',
                      user='root',
                      passwd=config_unsynced.pword_s,
@@ -28,16 +28,16 @@ def schools_input():
 SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
         .format(config.year_l[-1]))
         output_t_t = cur.fetchall()
-        school_s_l = list(set([output_t[0] for output_t in output_t_t]))
+        school_s_l = sorted(list(set([output_t[0] for output_t in output_t_t])))
 
     return render_template("index.html",
                            school_s_l = school_s_l)
-                         
-                         
+
+
 
 @app.route('/bar_plot')
 def bar_plot():
-    
+
     ID1 = request.args.get('ID1')
     ID2 = request.args.get('ID2')
     feature_s_l = []
@@ -60,11 +60,11 @@ def bar_plot():
     axis_from_bottom = 0.12
     num_plots = len(feature_s_l)+1
     axis_width = (1 - (num_plots+1)*axis_lr_margin) / num_plots
-    
+
     for i_feature, feature_s in enumerate(feature_s_l):
         school1_prediction = query_prediction_scores(feature_s, ID=ID1)
         school2_prediction = query_prediction_scores(feature_s, ID=ID2)
-                
+
         plot_num = i_feature+1
         axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
                                 axis_from_bottom,
@@ -83,7 +83,7 @@ def bar_plot():
         if all_database_stats_d[feature_s]['multiplier'] == 100:
             axis.set_ylim([0, 100])
         axis.set_title(all_database_stats_d[feature_s]['bar_plot_s'], fontsize=12)
-    
+
     plot_num = num_plots
     axis = fig.add_axes([axis_lr_margin*plot_num + axis_width*(plot_num-1),
                             axis_from_bottom,
@@ -94,10 +94,10 @@ def bar_plot():
     axis.bar(1, overall_score2, 1, color=color2_t, linewidth=0)
     axis.set_xlim([-0.25, 2.25])
     axis.set_xticks([0.5, 1.5])
-    axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)   
+    axis.set_xticklabels(['School\n1', 'School\n2'], fontsize=12)
     axis.set_ylim([0, 100])
     axis.set_title('Overall score', fontweight='bold', fontsize=12)
-    
+
     canvas = FigureCanvas(fig)
     output = StringIO.StringIO()
     canvas.print_png(output)
@@ -126,7 +126,7 @@ def schools_output():
         Feature = request.args.get('Feature')
     else:
         Feature = None
-        
+
     con = mdb.connect(host='localhost',
                      user='root',
                      passwd=config_unsynced.pword_s,
@@ -137,13 +137,13 @@ def schools_output():
 SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
         .format(config.year_l[-1]))
         output_t_t = cur.fetchall()
-        school_s_l = list(set([output_t[0] for output_t in output_t_t]))
-    
-    
+        school_s_l = sorted(list(set([output_t[0] for output_t in output_t_t])))
+
+
     ## Check if inputs correspond to valid schools
     schools1 = query_past_scores(None, name=Name1)
     schools2 = query_past_scores(None, name=Name2)
-    
+
     if (not schools1) or (not schools2):
         return render_template('error.html')
     else:
@@ -187,8 +187,8 @@ SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
             feature_list_s = feature_list_s[:-1]
             dropdown_s_l = sorted([all_database_stats_d[feature_s]['explanatory_name'] for \
                                    feature_s in features_to_plot_s_l])
-            
-            
+
+
             ## Calculate overall scores
             raw_score1 = 0
             raw_score2 = 0
@@ -208,8 +208,8 @@ SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
             bar_plot_message_2_s = '<font color="{1}">School 2 ({0}) score = {2:0.1f}/100</font>'.format(schools2[0]['name'], color2_s, norm_score2)
             bar_plot_message_1_s = Markup(bar_plot_message_1_s)
             bar_plot_message_2_s = Markup(bar_plot_message_2_s)
-                    
-        
+
+
             ## Information for time trace plot and for output text
             if Feature:
                 for database_s, val in all_database_stats_d.iteritems():
@@ -219,11 +219,11 @@ SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
                 default_dropdown_s = feature_d['explanatory_name']
                 schools1_past = query_past_scores(feature_s, name=Name1)
                 schools2_past = query_past_scores(feature_s, name=Name2)
-                schools1_prediction = query_prediction_scores(feature_s, 
+                schools1_prediction = query_prediction_scores(feature_s,
                                                               ID=schools1_past[0]['school_id'])
                 schools2_prediction = query_prediction_scores(feature_s,
                                                               ID=schools2_past[0]['school_id'])
-                                                          
+
                 school1_predicted_difference = schools1_prediction[0]['score_l'][-1] - \
                     schools2_prediction[0]['score_l'][-1]
                 num_years_prediction = len(schools1_prediction[0]['score_l'])
@@ -258,7 +258,7 @@ SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
                 schools2_past = []
                 output_message_s = ''
             output_message_s = Markup(output_message_s)
-                
+
 
         return render_template("index.html",
                                dropdown_s_l = dropdown_s_l,
@@ -277,8 +277,8 @@ SELECT ENTITY_NAME FROM master WHERE regents_pass_rate_{:d} IS NOT NULL;"""\
                                schools1_past = schools1_past,
                                schools2_past = schools2_past,
                                output_message_s = output_message_s)
-        
-                         
+
+
 
 @app.route('/plot')
 def plot():
@@ -286,17 +286,17 @@ def plot():
     ID1 = request.args.get('ID1')
     ID2 = request.args.get('ID2')
     feature_s = request.args.get('Feature')
-    
+
     feature_d = all_database_stats_d[feature_s]
     schools1_past = query_past_scores(feature_s, ID=ID1)
     schools1_prediction = query_prediction_scores(feature_s, ID=ID1)
     schools2_past = query_past_scores(feature_s, ID=ID2)
-    schools2_prediction = query_prediction_scores(feature_s, ID=ID2)   
+    schools2_prediction = query_prediction_scores(feature_s, ID=ID2)
 
     fig = plt.Figure()
     fig.patch.set_facecolor('white')
     axis = fig.add_axes([0.1, 0.23, 0.8, 0.67])
- 
+
     line_width = 2
     curve1, = axis.plot(config.year_l,
         np.array(schools1_past[0]['score_l'])*feature_d['multiplier'],
@@ -332,8 +332,8 @@ def plot():
 @app.route('/slides')
 def slides():
     return render_template('slides.html')
-        
-        
+
+
 
 def query_past_scores(feature_s, ID=None, name=None):
     con = mdb.connect(host='localhost',
@@ -350,7 +350,7 @@ def query_past_scores(feature_s, ID=None, name=None):
                 command_s += '{0}_{1:d}, '.format(feature_s, year)
         command_s = command_s[:-2]
         if ID:
-            command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)            
+            command_s += " FROM master WHERE ENTITY_CD='{0}';".format(ID)
         elif name:
             command_s += " FROM master WHERE ENTITY_NAME LIKE '%{0}%';"\
                 .format(name.upper())
@@ -364,11 +364,11 @@ def query_past_scores(feature_s, ID=None, name=None):
                                 score_l=result[2:]))
         else:
             schools.append(dict(school_id=result[0], name=result[1]))
-    
+
     return schools
-    
-    
-    
+
+
+
 def query_prediction_scores(feature_s, ID):
     con = mdb.connect(host='localhost',
                      user='root',
@@ -392,11 +392,11 @@ def query_prediction_scores(feature_s, ID):
     for result in query_results:
         schools.append(dict(school_id=result[0],
                             score_l=result[1:]))
-    
+
     return schools
-    
-    
-    
+
+
+
 all_database_stats_d = join_data.collect_database_stats()
 
 color1_t = (0.6357, 0.2788, 0.0855) #ab4b17
